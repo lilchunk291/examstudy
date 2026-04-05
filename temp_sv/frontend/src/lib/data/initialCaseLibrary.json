@@ -1,0 +1,542 @@
+[
+  {
+    "id": "case_001",
+    "problem": {
+      "emotion": "anxious",
+      "intent": "exam_prep",
+      "examProximity": "tomorrow",
+      "learnerType": "visual",
+      "sessionMinutes": 90,
+      "topicDifficulty": 7,
+      "winningClaims": [
+        "student_is_anxious",
+        "exam_pressure"
+      ]
+    },
+    "solution": {
+      "strategy": "reassure_then_plan",
+      "tone": "warm",
+      "responseTemplate": "Take a breath. You have covered {session_count} sessions this week and that preparation is real. Tonight focus only on {weak_subject} for {recommended_minutes} minutes then sleep. Your brain consolidates memory during sleep.",
+      "followUpQuestion": "Want me to outline exactly what to review?"
+    },
+    "outcome": {
+      "studentRating": 0.9,
+      "retentionImprovement": 0.7,
+      "followUpNeeded": true,
+      "sessionContinued": true
+    }
+  },
+  {
+    "id": "case_002",
+    "problem": {
+      "emotion": "confused",
+      "intent": "conceptual",
+      "examProximity": "3_days",
+      "learnerType": "relational",
+      "sessionMinutes": 45,
+      "topicDifficulty": 8,
+      "winningClaims": [
+        "concept_is_hard",
+        "student_is_lost"
+      ]
+    },
+    "solution": {
+      "strategy": "break_down_then_connect",
+      "tone": "patient",
+      "responseTemplate": "Let's break this down. Think of {concept} like something you already know: {analogy}. The key idea is {core_principle}. Want me to show you how this connects to {related_topic}?",
+      "followUpQuestion": "Does this connection make sense?"
+    },
+    "outcome": {
+      "studentRating": 0.8,
+      "retentionImprovement": 0.6,
+      "followUpNeeded": true,
+      "sessionContinued": true
+    }
+  },
+  {
+    "id": "case_003",
+    "problem": {
+      "emotion": "overwhelmed",
+      "intent": "triage",
+      "examProximity": "1_week",
+      "learnerType": "systemic",
+      "sessionMinutes": 30,
+      "topicDifficulty": 6,
+      "winningClaims": [
+        "too_much_content",
+        "time_pressure"
+      ]
+    },
+    "solution": {
+      "strategy": "prioritize_and_simplify",
+      "tone": "direct",
+      "responseTemplate": "Let's focus. Priority 1: {high_priority_topic}. Priority 2: {medium_priority_topic}. Ignore everything else. Spend 20 minutes on Priority 1, 10 on Priority 2. That's it.",
+      "followUpQuestion": "Ready to start with Priority 1?"
+    },
+    "outcome": {
+      "studentRating": 0.7,
+      "retentionImprovement": 0.5,
+      "followUpNeeded": false,
+      "sessionContinued": true
+    }
+  },
+  {
+    "id": "case_004",
+    "problem": {
+      "emotion": "frustrated",
+      "intent": "procedural",
+      "examProximity": "2_days",
+      "learnerType": "linear",
+      "sessionMinutes": 60,
+      "topicDifficulty": 9,
+      "winningClaims": [
+        "method_not_working",
+        "repeated_failures"
+      ]
+    },
+    "solution": {
+      "strategy": "step_by_step_fix",
+      "tone": "supportive",
+      "responseTemplate": "I see the frustration. Let's find where this breaks down. Step 1: {first_step}. Step 2: {second_step}. Where exactly do you get stuck?",
+      "followUpQuestion": "Which step is causing trouble?"
+    },
+    "outcome": {
+      "studentRating": 0.8,
+      "retentionImprovement": 0.6,
+      "followUpNeeded": true,
+      "sessionContinued": true
+    }
+  },
+  {
+    "id": "case_005",
+    "problem": {
+      "emotion": "tired",
+      "intent": "motivation",
+      "examProximity": "4_days",
+      "learnerType": "visual",
+      "sessionMinutes": 25,
+      "topicDifficulty": 5,
+      "winningClaims": [
+        "burnout",
+        "low_energy"
+      ]
+    },
+    "solution": {
+      "strategy": "energy_management",
+      "tone": "gentle",
+      "responseTemplate": "Your brain is telling you something. Study for 15 minutes only. Pick your easiest topic. Then stop. Your tomorrow-self needs rest more than cramming.",
+      "followUpQuestion": "What's your easiest topic right now?"
+    },
+    "outcome": {
+      "studentRating": 0.6,
+      "retentionImprovement": 0.4,
+      "followUpNeeded": false,
+      "sessionContinued": false
+    }
+  },
+  {
+    "id": "case_006",
+    "problem": {
+      "emotion": "curious",
+      "intent": "application",
+      "examProximity": "2_weeks",
+      "learnerType": "relational",
+      "sessionMinutes": 50,
+      "topicDifficulty": 4,
+      "winningClaims": [
+        "wants_practice",
+        "ready_to_apply"
+      ]
+    },
+    "solution": {
+      "strategy": "practical_examples",
+      "tone": "enthusiastic",
+      "responseTemplate": "Great question! Here's how {concept} works in real life: {real_world_example}. Try this: {practice_exercise}. What do you think would happen if {scenario}?",
+      "followUpQuestion": "Want to try another scenario?"
+    },
+    "outcome": {
+      "studentRating": 0.9,
+      "retentionImprovement": 0.8,
+      "followUpNeeded": true,
+      "sessionContinued": true
+    }
+  },
+  {
+    "id": "case_007",
+    "problem": {
+      "emotion": "anxious",
+      "intent": "comparison",
+      "examProximity": "3_days",
+      "learnerType": "systemic",
+      "sessionMinutes": 40,
+      "topicDifficulty": 7,
+      "winningClaims": [
+        "confusion_between_concepts",
+        "exam_specific"
+      ]
+    },
+    "solution": {
+      "strategy": "comparison_table",
+      "tone": "clear",
+      "responseTemplate": "Let's clarify the difference. {concept_A}: {definition_A}. {concept_B}: {definition_B}. Key difference: {key_difference}. Use {concept_A} when {use_case_A}. Use {concept_B} when {use_case_B}.",
+      "followUpQuestion": "Does this comparison clear things up?"
+    },
+    "outcome": {
+      "studentRating": 0.8,
+      "retentionImprovement": 0.7,
+      "followUpNeeded": false,
+      "sessionContinued": true
+    }
+  },
+  {
+    "id": "case_008",
+    "problem": {
+      "emotion": "stuck",
+      "intent": "stuck",
+      "examProximity": "1_day",
+      "learnerType": "linear",
+      "sessionMinutes": 35,
+      "topicDifficulty": 8,
+      "winningClaims": [
+        "complete_block",
+        "no_progress"
+      ]
+    },
+    "solution": {
+      "strategy": "breakthrough_technique",
+      "tone": "calm",
+      "responseTemplate": "Complete block happens. Let's try something different. Write down everything you know about {topic} without looking at notes. Even if it's wrong. Just write. The act of writing often unsticks the block.",
+      "followUpQuestion": "What did you write down?"
+    },
+    "outcome": {
+      "studentRating": 0.7,
+      "retentionImprovement": 0.5,
+      "followUpNeeded": true,
+      "sessionContinued": true
+    }
+  },
+  {
+    "id": "case_009",
+    "problem": {
+      "emotion": "overwhelmed",
+      "intent": "exam_technique",
+      "examProximity": "5_days",
+      "learnerType": "visual",
+      "sessionMinutes": 45,
+      "topicDifficulty": 6,
+      "winningClaims": [
+        "exam_strategy_needed",
+        "time_management"
+      ]
+    },
+    "solution": {
+      "strategy": "exam_strategy",
+      "tone": "strategic",
+      "responseTemplate": "Exam strategy for {subject}: 1. Read all questions first (5 min). 2. Do easy questions for confidence (15 min). 3. Return to hard questions (remaining time). 4. Never leave blank - partial marks count.",
+      "followUpQuestion": "Want to practice timing with sample questions?"
+    },
+    "outcome": {
+      "studentRating": 0.8,
+      "retentionImprovement": 0.6,
+      "followUpNeeded": true,
+      "sessionContinued": true
+    }
+  },
+  {
+    "id": "case_010",
+    "problem": {
+      "emotion": "confused",
+      "intent": "conceptual",
+      "examProximity": "1_week",
+      "learnerType": "relational",
+      "sessionMinutes": 55,
+      "topicDifficulty": 9,
+      "winningClaims": [
+        "abstract_concept",
+        "needs_concrete_example"
+      ]
+    },
+    "solution": {
+      "strategy": "concrete_to_abstract",
+      "tone": "patient",
+      "responseTemplate": "This is tricky. Start with something concrete: {concrete_example}. Now see how that leads to the abstract idea: {abstract_connection}. The pattern is {underlying_pattern}.",
+      "followUpQuestion": "Can you see the pattern now?"
+    },
+    "outcome": {
+      "studentRating": 0.7,
+      "retentionImprovement": 0.6,
+      "followUpNeeded": true,
+      "sessionContinued": true
+    }
+  },
+  {
+    "id": "case_011",
+    "problem": {
+      "emotion": "tired",
+      "intent": "motivation",
+      "examProximity": "2_days",
+      "learnerType": "systemic",
+      "sessionMinutes": 20,
+      "topicDifficulty": 4,
+      "winningClaims": [
+        "exhausted",
+        "can't_focus"
+      ]
+    },
+    "solution": {
+      "strategy": "micro_session",
+      "tone": "supportive",
+      "responseTemplate": "20 minutes is perfect right now. Focus only on {single_concept}. That's it. After 20 minutes, stop. Your brain needs the break more than the extra study time.",
+      "followUpQuestion": "Ready for that 20-minute focus?"
+    },
+    "outcome": {
+      "studentRating": 0.6,
+      "retentionImprovement": 0.4,
+      "followUpNeeded": false,
+      "sessionContinued": false
+    }
+  },
+  {
+    "id": "case_012",
+    "problem": {
+      "emotion": "anxious",
+      "intent": "procedural",
+      "examProximity": "12_hours",
+      "learnerType": "linear",
+      "sessionMinutes": 80,
+      "topicDifficulty": 8,
+      "winningClaims": [
+        "last_minute_cram",
+        "procedure_forgotten"
+      ]
+    },
+    "solution": {
+      "strategy": "emergency_protocol",
+      "tone": "urgent",
+      "responseTemplate": "Emergency protocol: Step 1: Write down the formula/process from memory. Step 2: Check against notes. Step 3: Practice 3 examples only. Step 4: Sleep. No more studying.",
+      "followUpQuestion": "What's the first step you remember?"
+    },
+    "outcome": {
+      "studentRating": 0.7,
+      "retentionImprovement": 0.5,
+      "followUpNeeded": false,
+      "sessionContinued": true
+    }
+  },
+  {
+    "id": "case_013",
+    "problem": {
+      "emotion": "frustrated",
+      "intent": "application",
+      "examProximity": "4_days",
+      "learnerType": "visual",
+      "sessionMinutes": 50,
+      "topicDifficulty": 7,
+      "winningClaims": [
+        "theory_understood",
+        "application_failing"
+      ]
+    },
+    "solution": {
+      "strategy": "bridge_theory_practice",
+      "tone": "encouraging",
+      "responseTemplate": "You understand the theory - that's the hard part! Application is just practice. Try this: map your theory to {specific_problem}. The connection is {bridge_concept}. Want to walk through it step by step?",
+      "followUpQuestion": "Where does the theory break down in practice?"
+    },
+    "outcome": {
+      "studentRating": 0.8,
+      "retentionImprovement": 0.6,
+      "followUpNeeded": true,
+      "sessionContinued": true
+    }
+  },
+  {
+    "id": "case_014",
+    "problem": {
+      "emotion": "confused",
+      "intent": "comparison",
+      "examProximity": "1_week",
+      "learnerType": "relational",
+      "sessionMinutes": 45,
+      "topicDifficulty": 6,
+      "winningClaims": [
+        "similar_concepts",
+        "subtle_differences"
+      ]
+    },
+    "solution": {
+      "strategy": "mnemonic_device",
+      "tone": "creative",
+      "responseTemplate": "Here's how to remember the difference: {mnemonic_phrase}. {concept_A} is {key_feature_A} (think of {memory_trigger_A}). {concept_B} is {key_feature_B} (think of {memory_trigger_B}).",
+      "followUpQuestion": "Does that help distinguish them?"
+    },
+    "outcome": {
+      "studentRating": 0.8,
+      "retentionImprovement": 0.7,
+      "followUpNeeded": false,
+      "sessionContinued": true
+    }
+  },
+  {
+    "id": "case_015",
+    "problem": {
+      "emotion": "overwhelmed",
+      "intent": "triage",
+      "examProximity": "6_hours",
+      "learnerType": "systemic",
+      "sessionMinutes": 30,
+      "topicDifficulty": 8,
+      "winningClaims": [
+        "crisis_mode",
+        "too_many_topics"
+      ]
+    },
+    "solution": {
+      "strategy": "crisis_triage",
+      "tone": "urgent",
+      "responseTemplate": "CRISIS MODE: Focus ONLY on {highest_value_topic}. That's it. Nothing else. Read your notes once. Write 3 key points. Sleep. That's the optimal strategy now.",
+      "followUpQuestion": "What are the 3 key points for {highest_value_topic}?"
+    },
+    "outcome": {
+      "studentRating": 0.6,
+      "retentionImprovement": 0.4,
+      "followUpNeeded": false,
+      "sessionContinued": true
+    }
+  },
+  {
+    "id": "case_016",
+    "problem": {
+      "emotion": "curious",
+      "intent": "conceptual",
+      "examProximity": "3_weeks",
+      "learnerType": "visual",
+      "sessionMinutes": 60,
+      "topicDifficulty": 5,
+      "winningClaims": [
+        "deep_understanding_desired",
+        "time_available"
+      ]
+    },
+    "solution": {
+      "strategy": "visual_explanation",
+      "tone": "enthusiastic",
+      "responseTemplate": "Perfect timing for deep learning! Picture {concept} as {visual_metaphor}. The {key_component} acts like {metaphor_component}. Here's how it flows: {flow_description}. Want me to sketch this out?",
+      "followUpQuestion": "Can you see the visual in your mind?"
+    },
+    "outcome": {
+      "studentRating": 0.9,
+      "retentionImprovement": 0.8,
+      "followUpNeeded": true,
+      "sessionContinued": true
+    }
+  },
+  {
+    "id": "case_017",
+    "problem": {
+      "emotion": "stuck",
+      "intent": "procedural",
+      "examProximity": "2_days",
+      "learnerType": "linear",
+      "sessionMinutes": 40,
+      "topicDifficulty": 7,
+      "winningClaims": [
+        "step_missing",
+        "process_breaks"
+      ]
+    },
+    "solution": {
+      "strategy": "gap_analysis",
+      "tone": "analytical",
+      "responseTemplate": "I see the gap. You're missing {missing_step}. Here's the complete sequence: {complete_sequence}. The key insight is {key_insight}. That's why it was breaking.",
+      "followUpQuestion": "Does that missing step make sense now?"
+    },
+    "outcome": {
+      "studentRating": 0.8,
+      "retentionImprovement": 0.6,
+      "followUpNeeded": true,
+      "sessionContinued": true
+    }
+  },
+  {
+    "id": "case_018",
+    "problem": {
+      "emotion": "anxious",
+      "intent": "exam_technique",
+      "examProximity": "1_day",
+      "learnerType": "relational",
+      "sessionMinutes": 35,
+      "topicDifficulty": 6,
+      "winningClaims": [
+        "exam_anxiety",
+        "performance_pressure"
+      ]
+    },
+    "solution": {
+      "strategy": "confidence_building",
+      "tone": "calm",
+      "responseTemplate": "Exam anxiety is normal. Here's what works: 1. You've prepared more than you think. 2. Start with easy questions to build momentum. 3. Remember: partial marks are better than blank answers. 4. Breathe between questions.",
+      "followUpQuestion": "Which of these feels most important to remember?"
+    },
+    "outcome": {
+      "studentRating": 0.7,
+      "retentionImprovement": 0.5,
+      "followUpNeeded": false,
+      "sessionContinued": true
+    }
+  },
+  {
+    "id": "case_019",
+    "problem": {
+      "emotion": "frustrated",
+      "intent": "stuck",
+      "examProximity": "3_days",
+      "learnerType": "systemic",
+      "sessionMinutes": 45,
+      "topicDifficulty": 9,
+      "winningClaims": [
+        "complex_system",
+        "can't_see_pattern"
+      ]
+    },
+    "solution": {
+      "strategy": "system_decomposition",
+      "tone": "methodical",
+      "responseTemplate": "Complex systems are hard. Let's decompose: {topic} has {component_count} main parts. {part_1} connects to {part_2} via {connection}. The overall pattern is {system_pattern}. Start with {entry_point}.",
+      "followUpQuestion": "Which component should we focus on first?"
+    },
+    "outcome": {
+      "studentRating": 0.8,
+      "retentionImprovement": 0.6,
+      "followUpNeeded": true,
+      "sessionContinued": true
+    }
+  },
+  {
+    "id": "case_020",
+    "problem": {
+      "emotion": "overwhelmed",
+      "intent": "triage",
+      "examProximity": "2_days",
+      "learnerType": "visual",
+      "sessionMinutes": 50,
+      "topicDifficulty": 8,
+      "winningClaims": [
+        "content_overload",
+        "prioritization_needed"
+      ]
+    },
+    "solution": {
+      "strategy": "visual_prioritization",
+      "tone": "clear",
+      "responseTemplate": "Let's prioritize visually. Draw a quick mind map: {center_topic} in middle. Branch 1: {priority_1} (must know). Branch 2: {priority_2} (should know). Branch 3: {priority_3} (nice to know). Focus only on Branch 1 today.",
+      "followUpQuestion": "What goes in your Branch 1?"
+    },
+    "outcome": {
+      "studentRating": 0.8,
+      "retentionImprovement": 0.6,
+      "followUpNeeded": true,
+      "sessionContinued": true
+    }
+  }
+]

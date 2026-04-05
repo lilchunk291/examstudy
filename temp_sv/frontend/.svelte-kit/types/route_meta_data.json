@@ -1,0 +1,23 @@
+{
+	"/": [],
+	"/ai": [],
+	"/auth/callback": [],
+	"/chat": [],
+	"/crisis": [],
+	"/dashboard": [],
+	"/deep-work": [],
+	"/demo": [],
+	"/import": [],
+	"/login": [],
+	"/privacy-vault": [],
+	"/profile": [],
+	"/register": [],
+	"/rooms": [],
+	"/schedule": [],
+	"/sessions": [],
+	"/settings": [],
+	"/settings/connectors": [],
+	"/settings/theme": [],
+	"/study": [],
+	"/vault": []
+}
