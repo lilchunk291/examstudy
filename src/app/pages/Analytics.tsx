@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { 
   TrendingUp, 
@@ -12,44 +13,93 @@ import {
   Sparkles
 } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from "recharts";
-
-const performanceData = [
-  { month: "Jan", score: 75, hours: 45 },
-  { month: "Feb", score: 78, hours: 52 },
-  { month: "Mar", score: 82, hours: 48 },
-  { month: "Apr", score: 85, hours: 60 },
-  { month: "May", score: 88, hours: 58 },
-  { month: "Jun", score: 90, hours: 65 },
-  { month: "Jul", score: 92, hours: 70 },
-];
-
-const subjectData = [
-  { subject: "Calculus", score: 92 },
-  { subject: "Physics", score: 88 },
-  { subject: "Chemistry", score: 85 },
-  { subject: "Biology", score: 90 },
-  { subject: "English", score: 87 },
-];
-
-const studyStyleData = [
-  { name: "Visual", value: 35 },
-  { name: "Auditory", value: 25 },
-  { name: "Kinesthetic", value: 20 },
-  { name: "Reading", value: 20 },
-];
-
-const radarData = [
-  { skill: "Active Recall", value: 90 },
-  { skill: "Spaced Repetition", value: 85 },
-  { skill: "Interleaving", value: 75 },
-  { skill: "Elaboration", value: 80 },
-  { skill: "Dual Coding", value: 70 },
-  { skill: "Practice Testing", value: 95 },
-];
-
-const COLORS = ["#6366f1", "#3b82f6", "#06b6d4", "#10b981"];
+import { getSupabase } from "../../lib/supabase";
 
 export default function Analytics() {
+  const [performanceData, setPerformanceData] = useState<any[]>([
+    { month: "Jan", score: 75, hours: 45 },
+    { month: "Feb", score: 78, hours: 52 },
+    { month: "Mar", score: 82, hours: 48 },
+    { month: "Apr", score: 85, hours: 60 },
+    { month: "May", score: 88, hours: 58 },
+    { month: "Jun", score: 90, hours: 65 },
+    { month: "Jul", score: 92, hours: 70 },
+  ]);
+
+  const [subjectData, setSubjectData] = useState<any[]>([
+    { subject: "Calculus", score: 92 },
+    { subject: "Physics", score: 88 },
+    { subject: "Chemistry", score: 85 },
+    { subject: "Biology", score: 90 },
+    { subject: "English", score: 87 },
+  ]);
+
+  const [studyStyleData, setStudyStyleData] = useState<any[]>([
+    { name: "Visual", value: 35 },
+    { name: "Auditory", value: 25 },
+    { name: "Kinesthetic", value: 20 },
+    { name: "Reading", value: 20 },
+  ]);
+
+  const [radarData, setRadarData] = useState<any[]>([
+    { skill: "Active Recall", value: 90 },
+    { skill: "Spaced Repetition", value: 85 },
+    { skill: "Interleaving", value: 75 },
+    { skill: "Elaboration", value: 80 },
+    { skill: "Dual Coding", value: 70 },
+    { skill: "Practice Testing", value: 95 },
+  ]);
+
+  const COLORS = ["#6366f1", "#3b82f6", "#06b6d4", "#10b981"];
+
+  useEffect(() => {
+    async function fetchAnalytics() {
+      try {
+        const supabase = getSupabase();
+        const { data, error } = await supabase.from('analytics_metrics').select('*');
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          data.forEach(item => {
+            if (item.type === 'performance') setPerformanceData(item.data);
+            if (item.type === 'subject') setSubjectData(item.data);
+            if (item.type === 'style') setStudyStyleData(item.data);
+            if (item.type === 'radar') setRadarData(item.data);
+          });
+        } else {
+          // Insert initial data
+          await supabase.from('analytics_metrics').insert([
+            { type: 'performance', data: performanceData },
+            { type: 'subject', data: subjectData },
+            { type: 'style', data: studyStyleData },
+            { type: 'radar', data: radarData }
+          ]);
+        }
+      } catch (error) {
+        console.error("Error fetching analytics:", error);
+      }
+    }
+    fetchAnalytics();
+
+    const supabase = getSupabase();
+    const analyticsSub = supabase
+      .channel('public:analytics_metrics')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'analytics_metrics' }, payload => {
+        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+          const item = payload.new;
+          if (item.type === 'performance') setPerformanceData(item.data);
+          if (item.type === 'subject') setSubjectData(item.data);
+          if (item.type === 'style') setStudyStyleData(item.data);
+          if (item.type === 'radar') setRadarData(item.data);
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(analyticsSub);
+    };
+  }, []);
+
   const containerVariants = {
     initial: { opacity: 0 },
     animate: {

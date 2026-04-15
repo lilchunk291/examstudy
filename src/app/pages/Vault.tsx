@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { 
   Lock, 
@@ -17,6 +18,7 @@ import {
   HardDrive,
   Activity
 } from "lucide-react";
+import { getSupabase } from "../../lib/supabase";
 
 const folders = [
   { name: "Calculus", files: 24, color: "indigo" },
@@ -46,6 +48,109 @@ const getFileIcon = (type: string) => {
 };
 
 export default function Vault() {
+  const [folders, setFolders] = useState<any[]>([]);
+  const [recentFiles, setRecentFiles] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const supabase = getSupabase();
+        
+        const [foldersResponse, filesResponse] = await Promise.all([
+          supabase.from('vault_folders').select('*').order('created_at', { ascending: true }),
+          supabase.from('vault_files').select('*').order('created_at', { ascending: false })
+        ]);
+
+        if (foldersResponse.error) throw foldersResponse.error;
+        if (filesResponse.error) throw filesResponse.error;
+
+        if (foldersResponse.data) {
+          setFolders(foldersResponse.data);
+        }
+
+        if (filesResponse.data) {
+          setRecentFiles(filesResponse.data);
+        }
+      } catch (error) {
+        console.error("Error fetching vault data:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchData();
+
+    const supabase = getSupabase();
+    
+    const foldersSub = supabase
+      .channel('public:vault_folders')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vault_folders' }, payload => {
+        if (payload.eventType === 'INSERT') {
+          setFolders(current => [...current, payload.new]);
+        } else if (payload.eventType === 'UPDATE') {
+          setFolders(current => current.map(f => f.id === payload.new.id ? payload.new : f));
+        } else if (payload.eventType === 'DELETE') {
+          setFolders(current => current.filter(f => f.id !== payload.old.id));
+        }
+      })
+      .subscribe();
+
+    const filesSub = supabase
+      .channel('public:vault_files')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vault_files' }, payload => {
+        if (payload.eventType === 'INSERT') {
+          setRecentFiles(current => [payload.new, ...current]);
+        } else if (payload.eventType === 'UPDATE') {
+          setRecentFiles(current => current.map(f => f.id === payload.new.id ? payload.new : f));
+        } else if (payload.eventType === 'DELETE') {
+          setRecentFiles(current => current.filter(f => f.id !== payload.old.id));
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(foldersSub);
+      supabase.removeChannel(filesSub);
+    };
+  }, []);
+
+  const handleCreateFolder = async () => {
+    const newFolder = {
+      name: "New Folder",
+      color: ["indigo", "blue", "emerald", "orange", "rose"][Math.floor(Math.random() * 5)]
+    };
+    try {
+      const supabase = getSupabase();
+      await supabase.from('vault_folders').insert([newFolder]);
+    } catch (error) {
+      console.error("Error creating folder:", error);
+    }
+  };
+
+  const handleUploadFile = async () => {
+    const newFile = {
+      name: `Document_${Math.floor(Math.random() * 1000)}.pdf`,
+      type: "pdf",
+      size: `${Math.floor(Math.random() * 10)} MB`,
+      starred: false
+    };
+    try {
+      const supabase = getSupabase();
+      await supabase.from('vault_files').insert([newFile]);
+    } catch (error) {
+      console.error("Error uploading file:", error);
+    }
+  };
+
+  const toggleStar = async (fileId: string, currentStatus: boolean) => {
+    try {
+      const supabase = getSupabase();
+      await supabase.from('vault_files').update({ starred: !currentStatus }).eq('id', fileId);
+    } catch (error) {
+      console.error("Error toggling star:", error);
+    }
+  };
+
   const containerVariants = {
     initial: { opacity: 0 },
     animate: {
@@ -87,6 +192,7 @@ export default function Vault() {
         <motion.button 
           whileHover={{ scale: 1.05, y: -5 }}
           whileActive={{ scale: 0.95 }}
+          onClick={handleUploadFile}
           className="flex items-center gap-6 px-8 py-4 bg-indigo-600 text-white rounded-full text-base font-bold tracking-tight shadow-xl shadow-indigo-200 transition-all"
         >
           <Upload className="w-6 h-6" strokeWidth={3} />
@@ -135,7 +241,7 @@ export default function Vault() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
               {folders.map((folder) => (
                 <motion.div
-                  key={folder.name}
+                  key={folder.id || folder.name}
                   variants={cardVariants}
                   whileHover="hover"
                   className="bg-white/40 backdrop-blur-3xl border border-white/20 p-8 rounded-3xl shadow-xl group cursor-pointer relative overflow-hidden"
@@ -145,13 +251,13 @@ export default function Vault() {
                     <div className={`w-14 h-14 rounded-2xl bg-${folder.color}-500/10 flex items-center justify-center border border-${folder.color}-500/20 shadow-inner group-hover:scale-110 transition-transform`}>
                       <Folder className={`w-8 h-8 text-${folder.color}-600`} strokeWidth={3} />
                     </div>
-                    <button className="p-3 text-slate-400 hover:text-slate-600 transition-colors bg-white/40 rounded-xl border border-white/40">
+                    <button onClick={(e) => { e.stopPropagation(); handleCreateFolder(); }} className="p-3 text-slate-400 hover:text-slate-600 transition-colors bg-white/40 rounded-xl border border-white/40">
                       <MoreVertical className="w-6 h-6" strokeWidth={3} />
                     </button>
                   </div>
                   <div className="relative z-10">
                     <div className="text-base font-bold tracking-tight text-slate-900 mb-2 group-hover:text-indigo-600 transition-colors">{folder.name}</div>
-                    <div className="text-[10px] font-bold text-slate-400 tracking-[0.3em] uppercase">{folder.files} Documents</div>
+                    <div className="text-[10px] font-bold text-slate-400 tracking-[0.3em] uppercase">{folder.files || 0} Documents</div>
                   </div>
                 </motion.div>
               ))}
@@ -169,7 +275,7 @@ export default function Vault() {
             <div className="space-y-6">
               {recentFiles.map((file, index) => (
                 <motion.div
-                  key={index}
+                  key={file.id || index}
                   variants={cardVariants}
                   whileHover="hover"
                   className="flex items-center gap-8 p-6 rounded-3xl bg-white/40 backdrop-blur-3xl border border-white/20 hover:bg-white/60 hover:shadow-xl transition-all group cursor-pointer"
@@ -183,12 +289,13 @@ export default function Vault() {
                       <span className="bg-white/40 px-4 py-2 rounded-full border border-white/40 shadow-sm">{file.size}</span>
                       <div className="flex items-center gap-3">
                         <Clock className="w-4 h-4 text-indigo-500" strokeWidth={3} />
-                        <span>{file.date}</span>
+                        <span>{file.created_at ? new Date(file.created_at).toLocaleDateString() : file.date}</span>
                       </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-6">
                     <motion.button 
+                      onClick={(e) => { e.stopPropagation(); toggleStar(file.id, file.starred); }}
                       whileHover={{ scale: 1.1, rotate: 5 }}
                       whileActive={{ scale: 0.9 }}
                       className={`p-3 rounded-xl transition-all border shadow-lg ${file.starred ? "text-amber-500 bg-amber-500/10 border-amber-500/20" : "text-slate-300 bg-white/40 border-white/40 hover:text-amber-500"}`}

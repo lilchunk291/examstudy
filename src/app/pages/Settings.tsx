@@ -70,12 +70,14 @@ export default function Settings() {
               { label: "Notifications", icon: Bell },
               { label: "Privacy & Security", icon: Shield },
               { label: "Integrations", icon: Link2 },
+              { label: "Theme", icon: Sparkles, to: "/app/theme" },
               { label: "Billing", icon: CreditCard },
             ].map((item, i) => (
               <motion.button 
                 key={i}
                 whileHover={{ x: 10 }}
                 whileTap={{ scale: 0.98 }}
+                onClick={() => item.to && (window.location.href = item.to)}
                 className={`w-full flex items-center gap-6 px-6 py-3 rounded-2xl text-sm font-bold tracking-tight transition-all group ${
                   item.active 
                     ? "bg-indigo-600 text-white shadow-2xl shadow-indigo-200" 

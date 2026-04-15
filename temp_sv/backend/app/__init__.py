@@ -1,1 +1,0 @@
-"""ScholarMind Backend Application"""

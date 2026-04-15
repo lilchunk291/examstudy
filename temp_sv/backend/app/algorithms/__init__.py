@@ -1,1 +1,0 @@
-"""Algorithms for institutional scheduling"""
