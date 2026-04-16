@@ -36,7 +36,7 @@ export default function Settings() {
   const cardVariants = {
     initial: { opacity: 0, y: 20 },
     animate: { opacity: 1, y: 0 },
-    hover: { scale: 1.02, transition: { type: "spring", stiffness: 300, damping: 20 } }
+    hover: { scale: 1.02, transition: { type: "spring" as const, stiffness: 300, damping: 20 } }
   };
 
   return (
