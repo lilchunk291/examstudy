@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { 
   Send, 
   Paperclip, 
@@ -846,7 +848,11 @@ export default function Chat() {
                       ))}
                     </div>
                   )}
-                  <p className="text-[15px] leading-relaxed whitespace-pre-wrap font-medium">{message.content}</p>
+                  <div className="markdown-body text-[15px] leading-relaxed font-medium">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {message.content}
+                    </ReactMarkdown>
+                  </div>
                 </div>
               </motion.div>
             ))}

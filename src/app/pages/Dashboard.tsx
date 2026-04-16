@@ -35,7 +35,7 @@ export default function Dashboard() {
     animate: { opacity: 1, y: 0 },
     hover: { 
       scale: 1.02, 
-      transition: { type: "spring", stiffness: 300, damping: 20 }
+      transition: { type: "spring" as const, stiffness: 300, damping: 20 }
     }
   };
   
@@ -128,9 +128,11 @@ export default function Dashboard() {
 
   const sortedTasks = [...tasks].sort((a, b) => {
     if (a.completed !== b.completed) return a.completed ? 1 : -1;
-    const priorityWeight = { high: 3, medium: 2, low: 1 };
-    if (priorityWeight[a.priority as keyof typeof priorityWeight] !== priorityWeight[b.priority as keyof typeof priorityWeight]) {
-      return priorityWeight[b.priority as keyof typeof priorityWeight] - priorityWeight[a.priority as keyof typeof priorityWeight];
+    const priorityWeight: Record<string, number> = { high: 3, medium: 2, low: 1 };
+    const weightA = priorityWeight[a.priority] || 0;
+    const weightB = priorityWeight[b.priority] || 0;
+    if (weightA !== weightB) {
+      return weightB - weightA;
     }
     return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
   });

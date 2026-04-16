@@ -31,7 +31,7 @@ export default function Profile() {
   const cardVariants = {
     initial: { opacity: 0, y: 20 },
     animate: { opacity: 1, y: 0 },
-    hover: { scale: 1.02, transition: { type: "spring", stiffness: 300, damping: 20 } }
+    hover: { scale: 1.02, transition: { type: "spring" as const, stiffness: 300, damping: 20 } }
   };
 
   return (
@@ -68,7 +68,7 @@ export default function Profile() {
             </div>
             <motion.button 
               whileHover={{ scale: 1.1, rotate: 5 }}
-              whileActive={{ scale: 0.9 }}
+              whileTap={{ scale: 0.9 }}
               className="absolute -bottom-2 -right-2 w-10 h-10 rounded-xl bg-white text-slate-900 flex items-center justify-center transition-all border border-white/60 shadow-lg"
             >
               <Camera className="w-6 h-6" strokeWidth={3} />
@@ -89,7 +89,7 @@ export default function Profile() {
             <div className="flex flex-wrap gap-6">
               <motion.button 
                 whileHover={{ scale: 1.05, y: -5 }}
-                whileActive={{ scale: 0.95 }}
+                whileTap={{ scale: 0.95 }}
                 className="flex items-center gap-4 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full text-base font-bold tracking-tight transition-all shadow-xl shadow-indigo-200"
               >
                 <Edit className="w-5 h-5" strokeWidth={4} />
@@ -97,7 +97,7 @@ export default function Profile() {
               </motion.button>
               <motion.button 
                 whileHover={{ scale: 1.05, y: -5 }}
-                whileActive={{ scale: 0.95 }}
+                whileTap={{ scale: 0.95 }}
                 className="px-6 py-3 bg-white/80 border border-white/60 text-slate-900 rounded-full text-base font-bold tracking-tight transition-all hover:bg-white shadow-lg"
               >
                 Change Password
@@ -290,7 +290,7 @@ export default function Profile() {
         <div className="flex flex-wrap items-center gap-6">
           <motion.button 
             whileHover={{ scale: 1.05, y: -5 }}
-            whileActive={{ scale: 0.95 }}
+            whileTap={{ scale: 0.95 }}
             className="flex items-center gap-4 px-6 py-3 bg-white/80 border border-white/60 hover:bg-white text-slate-900 rounded-full text-base font-bold tracking-tight transition-all shadow-lg"
           >
             <Download className="w-5 h-5" strokeWidth={3} />
@@ -298,7 +298,7 @@ export default function Profile() {
           </motion.button>
           <motion.button 
             whileHover={{ scale: 1.05, y: -5 }}
-            whileActive={{ scale: 0.95 }}
+            whileTap={{ scale: 0.95 }}
             className="flex items-center gap-4 px-6 py-3 bg-white/80 border border-white/60 hover:bg-white text-slate-900 rounded-full text-base font-bold tracking-tight transition-all shadow-lg"
           >
             <Download className="w-5 h-5" strokeWidth={3} />
@@ -306,7 +306,7 @@ export default function Profile() {
           </motion.button>
           <motion.button 
             whileHover={{ scale: 1.05, x: 10 }}
-            whileActive={{ scale: 0.95 }}
+            whileTap={{ scale: 0.95 }}
             className="flex items-center gap-4 px-6 py-3 bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500 hover:text-white text-rose-600 rounded-full text-base font-bold tracking-tight transition-all ml-auto shadow-lg"
           >
             <Trash2 className="w-5 h-5" strokeWidth={3} />

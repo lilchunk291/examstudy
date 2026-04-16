@@ -191,7 +191,7 @@ export default function Vault() {
         </div>
         <motion.button 
           whileHover={{ scale: 1.05, y: -5 }}
-          whileActive={{ scale: 0.95 }}
+          whileTap={{ scale: 0.95 }}
           onClick={handleUploadFile}
           className="flex items-center gap-6 px-8 py-4 bg-indigo-600 text-white rounded-full text-base font-bold tracking-tight shadow-xl shadow-indigo-200 transition-all"
         >
@@ -216,7 +216,7 @@ export default function Vault() {
         </div>
         <motion.button 
           whileHover={{ scale: 1.05 }}
-          whileActive={{ scale: 0.95 }}
+          whileTap={{ scale: 0.95 }}
           className="flex items-center gap-6 px-8 py-4 bg-white/40 backdrop-blur-3xl border border-white/20 rounded-2xl text-slate-700 hover:bg-white/60 transition-all shadow-xl"
         >
           <Filter className="w-6 h-6" strokeWidth={3} />
@@ -297,14 +297,14 @@ export default function Vault() {
                     <motion.button 
                       onClick={(e) => { e.stopPropagation(); toggleStar(file.id, file.starred); }}
                       whileHover={{ scale: 1.1, rotate: 5 }}
-                      whileActive={{ scale: 0.9 }}
+                      whileTap={{ scale: 0.9 }}
                       className={`p-3 rounded-xl transition-all border shadow-lg ${file.starred ? "text-amber-500 bg-amber-500/10 border-amber-500/20" : "text-slate-300 bg-white/40 border-white/40 hover:text-amber-500"}`}
                     >
                       <Star className={`w-6 h-6 ${file.starred ? "fill-current" : ""}`} strokeWidth={3} />
                     </motion.button>
                     <motion.button 
                       whileHover={{ scale: 1.1 }}
-                      whileActive={{ scale: 0.9 }}
+                      whileTap={{ scale: 0.9 }}
                       className="p-3 text-slate-400 hover:text-slate-900 bg-white/40 border border-white/40 rounded-xl transition-all shadow-lg"
                     >
                       <MoreVertical className="w-6 h-6" strokeWidth={3} />
@@ -354,7 +354,7 @@ export default function Vault() {
 
             <motion.button 
               whileHover={{ scale: 1.05, y: -5 }}
-              whileActive={{ scale: 0.95 }}
+              whileTap={{ scale: 0.95 }}
               className="w-full py-4 bg-white/80 hover:bg-white border border-white/60 rounded-2xl text-base font-bold text-slate-900 transition-all shadow-lg relative z-10"
             >
               Expand Capacity

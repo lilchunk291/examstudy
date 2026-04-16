@@ -111,7 +111,7 @@ export default function Analytics() {
   const cardVariants = {
     initial: { opacity: 0, y: 20 },
     animate: { opacity: 1, y: 0 },
-    hover: { scale: 1.02, transition: { type: "spring", stiffness: 300, damping: 20 } }
+    hover: { scale: 1.02, transition: { type: "spring" as const, stiffness: 300, damping: 20 } }
   };
 
   return (
@@ -138,7 +138,7 @@ export default function Analytics() {
           </div>
           <motion.button 
             whileHover={{ scale: 1.05, y: -5 }}
-            whileActive={{ scale: 0.95 }}
+            whileTap={{ scale: 0.95 }}
             className="px-6 py-3 bg-indigo-600 text-white rounded-full text-base font-bold shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all flex items-center gap-3"
           >
             <Sparkles className="w-5 h-5" strokeWidth={3} />
@@ -367,7 +367,7 @@ export default function Analytics() {
               </div>
               <div className="space-y-2 relative z-10">
                 <div className={`text-lg font-bold tracking-tight text-${insight.color}-900`}>{insight.title}</div>
-                <p className={`text-sm font-semibold text-${insight.color}-700/80 leading-relaxed tracking-tight`}>
+                <p className={`text-sm font-semibold text-${insight.color}-700/80 leading-relaxed tracking-tight whitespace-pre-wrap`}>
                   {insight.desc}
                 </p>
               </div>

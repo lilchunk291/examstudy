@@ -32,8 +32,34 @@ import { getSupabase } from "../../lib/supabase";
 import FocusMode from "../components/FocusMode";
 import { toast } from "sonner";
 
+type Event = {
+  id: string;
+  title: string;
+  type: string;
+  color: string;
+  start: Date;
+  duration: number;
+  icon: any;
+  goal?: string;
+  goalAchieved?: boolean;
+  meetingLink?: string;
+  platform?: string;
+  reminderType?: string;
+  reminderTime?: string;
+};
+
+type Task = {
+  id: string;
+  title: string;
+  priority: string;
+  completed: boolean;
+  dueDate: string;
+  reminderType?: string;
+  reminderTime?: string;
+};
+
 // Mock data for initial state
-const INITIAL_EVENTS = [
+const INITIAL_EVENTS: Event[] = [
   { id: "1", title: "Advanced Algorithms", type: "Deep Work", color: "indigo", start: new Date(2026, 8, 17, 9, 0), duration: 150, icon: Zap },
   { id: "2", title: "Lunch & Rest", type: "Break", color: "slate", start: new Date(2026, 8, 17, 12, 30), duration: 60, icon: Clock },
   { id: "3", title: "LMS Sync: BioTech", type: "Sync", color: "emerald", start: new Date(2026, 8, 17, 14, 0), duration: 90, icon: LayoutGrid },
@@ -44,7 +70,7 @@ export default function Schedule() {
   const navigate = useNavigate();
   const [currentDate, setCurrentDate] = useState(new Date(2026, 8, 17));
   const [view, setView] = useState<"day" | "week" | "month">("week");
-  const [events, setEvents] = useState(INITIAL_EVENTS);
+  const [events, setEvents] = useState<Event[]>(INITIAL_EVENTS);
   const [scheduleSearchQuery, setScheduleSearchQuery] = useState("");
   const [isAiPanelOpen, setIsAiPanelOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -71,11 +97,99 @@ export default function Schedule() {
   const [dbSchema, setDbSchema] = useState<{ hasMeetingLink: boolean; hasPlatform: boolean }>({ hasMeetingLink: true, hasPlatform: true });
   const [newTask, setNewTask] = useState({ title: "", priority: "medium", dueDate: format(new Date(), "yyyy-MM-dd"), reminderType: "none", reminderTime: "09:00" });
   const [activeFocusSession, setActiveFocusSession] = useState<any>(null);
+  const [taskToDelete, setTaskToDelete] = useState<string | null>(null);
   const [taskToConfirm, setTaskToConfirm] = useState<{id: string, status: boolean} | null>(null);
   const [aiSuggestions, setAiSuggestions] = useState<any[]>([]);
+  const [eventToDelete, setEventToDelete] = useState<string | null>(null);
+  const [targetHours, setTargetHours] = useState(() => {
+    const saved = localStorage.getItem("target_hours");
+    return saved ? parseInt(saved) : 8;
+  });
+
+  useEffect(() => {
+    localStorage.setItem("target_hours", JSON.stringify(targetHours));
+  }, [targetHours]);
+
+  const totalFocusMinutes = events.reduce((acc, e) => acc + e.duration, 0);
+  const totalFocusHours = Math.round((totalFocusMinutes / 60) * 10) / 10;
+
+  const [quickEventTitle, setQuickEventTitle] = useState("");
+  const [dailyGoals, setDailyGoals] = useState<{id: string, title: string, completed: boolean}[]>(() => {
+    const saved = localStorage.getItem("daily_goals");
+    return saved ? JSON.parse(saved) : [
+      { id: "g1", title: "Study for 4 hours", completed: false },
+      { id: "g2", title: "Complete Calculus homework", completed: false },
+      { id: "g3", title: "Review flashcards", completed: true }
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem("daily_goals", JSON.stringify(dailyGoals));
+  }, [dailyGoals]);
+
+  const addDailyGoal = (title: string) => {
+    if (!title.trim()) return;
+    setDailyGoals([...dailyGoals, { id: Date.now().toString(), title, completed: false }]);
+  };
+
+  const toggleDailyGoal = (id: string) => {
+    setDailyGoals(dailyGoals.map(g => g.id === id ? { ...g, completed: !g.completed } : g));
+    if (!dailyGoals.find(g => g.id === id)?.completed) {
+      playSuccessSound();
+    }
+  };
+
+  const deleteDailyGoal = (id: string) => {
+    setDailyGoals(dailyGoals.filter(g => g.id !== id));
+  };
+
+  const handleQuickEventAdd = async () => {
+    if (!quickEventTitle.trim()) return;
+    
+    const now = new Date();
+    const eventData = {
+      title: quickEventTitle,
+      type: "Deep Work",
+      color: "indigo",
+      start_time: now.toISOString(),
+      duration_minutes: 60,
+      icon_name: 'Zap'
+    };
+
+    try {
+      const supabase = getSupabase();
+      const { data, error } = await supabase.from('events').insert([eventData]).select().single();
+      if (error) throw error;
+      setEvents([...events, {
+        id: data.id,
+        title: data.title,
+        type: data.type,
+        color: data.color,
+        start: new Date(data.start_time),
+        duration: data.duration_minutes,
+        icon: Zap,
+        goal: "",
+        goalAchieved: false
+      }]);
+      setQuickEventTitle("");
+      toast.success("Event added!");
+    } catch (error) {
+      console.error("Error adding quick event:", error);
+      setEvents([...events, {
+        id: `m-${Date.now()}`,
+        ...eventData,
+        start: now,
+        duration: 60,
+        icon: Zap,
+        goal: "",
+        goalAchieved: false
+      }]);
+      setQuickEventTitle("");
+    }
+  };
   const [isGeneratingSuggestions, setIsGeneratingSuggestions] = useState(false);
   const [isPrioritizing, setIsPrioritizing] = useState(false);
-  const [tasks, setTasks] = useState([
+  const [tasks, setTasks] = useState<Task[]>([
     { id: "t1", title: "Review Calculus Notes", priority: "high", completed: false, dueDate: "2026-09-18" },
     { id: "t2", title: "Submit Bio Assignment", priority: "medium", completed: true, dueDate: "2026-09-17" },
     { id: "t3", title: "Read Ethics Chapter 4", priority: "low", completed: false, dueDate: "2026-09-20" },
@@ -676,8 +790,14 @@ export default function Schedule() {
   };
 
   const handleDeleteEvent = async (eventId: string) => {
+    if (!eventToDelete) {
+      setEventToDelete(eventId);
+      return;
+    }
+
     const previousEvents = [...events];
     setEvents(events.filter(e => e.id !== eventId));
+    setEventToDelete(null);
     
     try {
       const supabase = getSupabase();
@@ -685,9 +805,11 @@ export default function Schedule() {
         const { error } = await supabase.from('events').delete().eq('id', eventId);
         if (error) throw error;
       }
+      toast.success("Event deleted");
     } catch (error) {
       console.error("Error deleting event:", error);
       setEvents(previousEvents);
+      toast.error("Failed to delete event");
     }
   };
 
@@ -891,6 +1013,30 @@ export default function Schedule() {
     }
   };
 
+  const handleDeleteTask = async (taskId: string) => {
+    if (!taskToDelete || taskToDelete !== taskId) {
+      setTaskToDelete(taskId);
+      return;
+    }
+
+    const previousTasks = [...tasks];
+    setTasks(tasks.filter(t => t.id !== taskId));
+    setTaskToDelete(null);
+    
+    try {
+      const supabase = getSupabase();
+      if (!taskId.toString().startsWith('t')) {
+        const { error } = await supabase.from('tasks').delete().eq('id', taskId);
+        if (error) throw error;
+      }
+      toast.success("Task deleted");
+    } catch (error) {
+      console.error("Error deleting task:", error);
+      setTasks(previousTasks);
+      toast.error("Failed to delete task");
+    }
+  };
+
   const confirmTaskCompletion = () => {
     if (taskToConfirm) {
       executeTaskCompletionToggle(taskToConfirm.id, taskToConfirm.status);
@@ -1039,6 +1185,98 @@ export default function Schedule() {
       <div className="flex-1 flex overflow-hidden bg-slate-50/50">
         {/* Left Sidebar - Mini Calendar & Navigation */}
         <div className="w-64 border-r border-slate-200 bg-white p-6 space-y-8 overflow-y-auto hidden lg:block custom-scrollbar">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between px-1">
+              <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Target Hours</h3>
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">
+                  {totalFocusHours}/{targetHours}h
+                </span>
+              </div>
+            </div>
+            <div className="space-y-3">
+              <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: `${Math.min((totalFocusHours / targetHours) * 100, 100)}%` }}
+                  className="h-full bg-indigo-600"
+                />
+              </div>
+              <input 
+                type="range" 
+                min="1" 
+                max="16" 
+                value={targetHours}
+                onChange={(e) => setTargetHours(parseInt(e.target.value))}
+                className="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+              />
+              <p className="text-[10px] text-slate-400 font-medium text-center">Adjust daily focus target</p>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex items-center justify-between px-1">
+              <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Daily Goals</h3>
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">
+                  {dailyGoals.filter(g => g.completed).length}/{dailyGoals.length}
+                </span>
+              </div>
+            </div>
+            <div className="space-y-2">
+              {dailyGoals.map(goal => (
+                <div key={goal.id} className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg transition-all group">
+                  <button 
+                    onClick={() => toggleDailyGoal(goal.id)}
+                    className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${
+                      goal.completed ? "bg-indigo-600 border-indigo-600 text-white" : "border-slate-300 hover:border-indigo-500"
+                    }`}
+                  >
+                    {goal.completed && <CheckCircle2 className="w-3 h-3" />}
+                  </button>
+                  <span className={`text-xs font-medium flex-1 whitespace-pre-wrap ${goal.completed ? "text-slate-400 line-through" : "text-slate-700"}`}>
+                    {goal.title}
+                  </span>
+                  <button 
+                    onClick={() => deleteDailyGoal(goal.id)}
+                    className="opacity-0 group-hover:opacity-100 p-1 text-slate-300 hover:text-rose-500 transition-all"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+              <div className="relative group mt-2">
+                <Plus className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+                <input 
+                  type="text"
+                  placeholder="Add goal..."
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      addDailyGoal((e.target as HTMLInputElement).value);
+                      (e.target as HTMLInputElement).value = "";
+                    }
+                  }}
+                  className="w-full pl-7 pr-2 py-1.5 bg-slate-50 border border-slate-100 rounded-lg text-xs focus:outline-none focus:border-indigo-500 transition-all"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-1">Quick Add Event</h3>
+            <div className="relative group">
+              <Zap className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-indigo-400" />
+              <input 
+                type="text"
+                value={quickEventTitle}
+                onChange={(e) => setQuickEventTitle(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleQuickEventAdd()}
+                placeholder="What's next?"
+                className="w-full pl-9 pr-4 py-2 bg-indigo-50/50 border border-indigo-100 rounded-xl text-xs font-bold focus:outline-none focus:border-indigo-500 transition-all placeholder:text-indigo-300"
+              />
+            </div>
+          </div>
+
           <div className="space-y-4">
             <div className="flex items-center justify-between px-1">
               <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Calendar</h3>
@@ -1284,11 +1522,21 @@ export default function Schedule() {
                         return (
                           <motion.div
                             key={event.id}
+                            drag
+                            dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
+                            dragElastic={0.1}
+                            onDragEnd={(_, info) => {
+                              // Simple drag feedback, real persistence would need coordinate mapping
+                              if (Math.abs(info.offset.y) > 20) {
+                                toast.info("Drag & Drop: Event time updated (Simulated)");
+                              }
+                            }}
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             whileHover={{ scale: 1.01, zIndex: 10 }}
+                            whileDrag={{ scale: 1.05, zIndex: 50, boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.1)" }}
                             style={{ top: `${top}px`, height: `${height}px` }}
-                            className={`absolute left-0.5 right-0.5 rounded-md border-l-4 shadow-sm cursor-pointer overflow-hidden group transition-all border-y border-r border-slate-200/50 ${colorMap[event.color] || colorMap.slate}`}
+                            className={`absolute left-0.5 right-0.5 rounded-md border-l-4 shadow-sm cursor-grab active:cursor-grabbing overflow-hidden group transition-all border-y border-r border-slate-200/50 ${colorMap[event.color] || colorMap.slate}`}
                             onClick={() => openEditEvent(event)}
                           >
                             <div className="p-2 h-full flex flex-col">
@@ -1351,10 +1599,10 @@ export default function Schedule() {
                                 </button>
                                 <button 
                                   onClick={(e) => { e.stopPropagation(); handleDeleteEvent(event.id); }} 
-                                  className="p-1 hover:bg-black/5 rounded text-rose-600"
-                                  title="Delete Event"
+                                  className={`p-1 rounded transition-all ${eventToDelete === event.id ? "bg-rose-500 text-white" : "text-rose-600 hover:bg-black/5"}`}
+                                  title={eventToDelete === event.id ? "Click again to confirm" : "Delete Event"}
                                 >
-                                  <X className="w-3 h-3" />
+                                  {eventToDelete === event.id ? <CheckCircle2 className="w-3 h-3" /> : <X className="w-3 h-3" />}
                                 </button>
                               </div>
                             </div>
@@ -1422,14 +1670,25 @@ export default function Schedule() {
                     }`}>
                       {task.priority}
                     </div>
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); requestTaskCompletionToggle(task.id, task.completed); }}
-                      className={`w-7 h-7 rounded-xl border-2 flex items-center justify-center transition-all ${
-                        task.completed ? "bg-emerald-500 border-emerald-500 text-white" : "border-slate-200 hover:border-indigo-500 bg-white"
-                      }`}
-                    >
-                      {task.completed && <CheckCircle2 className="w-4 h-4" />}
-                    </button>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); requestTaskCompletionToggle(task.id, task.completed); }}
+                        className={`w-7 h-7 rounded-xl border-2 flex items-center justify-center transition-all ${
+                          task.completed ? "bg-emerald-500 border-emerald-500 text-white" : "border-slate-200 hover:border-indigo-500 bg-white"
+                        }`}
+                      >
+                        {task.completed && <CheckCircle2 className="w-4 h-4" />}
+                      </button>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id); }}
+                        className={`w-7 h-7 rounded-xl border-2 flex items-center justify-center transition-all ${
+                          taskToDelete === task.id ? "bg-rose-500 border-rose-500 text-white" : "border-slate-200 hover:border-rose-500 bg-white text-rose-500"
+                        }`}
+                        title={taskToDelete === task.id ? "Click again to confirm" : "Delete Task"}
+                      >
+                        {taskToDelete === task.id ? <CheckCircle2 className="w-4 h-4" /> : <X className="w-4 h-4" />}
+                      </button>
+                    </div>
                   </div>
                   <h4 className={`font-bold text-sm mb-4 line-clamp-2 leading-relaxed ${task.completed ? 'text-slate-400 line-through' : 'text-slate-900'}`}>
                     {task.title}
@@ -1493,7 +1752,7 @@ export default function Schedule() {
                     <h4 className="font-bold text-base mb-2 text-slate-900 group-hover:text-indigo-600 transition-colors">
                       {suggestion.title}
                     </h4>
-                    <p className="text-xs font-medium text-slate-500 leading-relaxed mb-6 flex-1">
+                    <p className="text-xs font-medium text-slate-500 leading-relaxed mb-6 flex-1 whitespace-pre-wrap">
                       {suggestion.reason}
                     </p>
                     <button 
@@ -1589,7 +1848,7 @@ export default function Schedule() {
                     <span className="text-[9px] font-bold text-slate-400">{suggestion.duration}m</span>
                   </div>
                   <h4 className="text-[11px] font-bold text-slate-900 leading-tight">{suggestion.title}</h4>
-                  <p className="text-[10px] text-slate-500 leading-relaxed">{suggestion.reason}</p>
+                  <p className="text-[10px] text-slate-500 leading-relaxed whitespace-pre-wrap">{suggestion.reason}</p>
                   <button 
                     onClick={() => acceptSuggestion(suggestion)}
                     className="w-full py-2 bg-white hover:bg-indigo-600 hover:text-white text-indigo-600 rounded-lg text-[10px] font-bold border border-indigo-100 transition-all shadow-sm"
@@ -1769,7 +2028,7 @@ export default function Schedule() {
                   <>
                     <motion.button
                       whileHover={{ scale: 1.02 }}
-                      whileActive={{ scale: 0.98 }}
+                      whileTap={{ scale: 0.98 }}
                       onClick={generateWeeklyPlan}
                       className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold tracking-tight shadow-xl shadow-slate-200 flex items-center justify-center gap-3"
                     >
@@ -1778,7 +2037,7 @@ export default function Schedule() {
                     </motion.button>
                     <motion.button
                       whileHover={{ scale: 1.02 }}
-                      whileActive={{ scale: 0.98 }}
+                      whileTap={{ scale: 0.98 }}
                       onClick={handleGenerateAiSchedule}
                       className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold tracking-tight shadow-xl shadow-indigo-200 flex items-center justify-center gap-3"
                     >

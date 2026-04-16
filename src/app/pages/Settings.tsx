@@ -124,7 +124,7 @@ export default function Settings() {
                 </div>
                 <motion.button 
                   whileHover={{ scale: 1.1, rotate: 5 }}
-                  whileActive={{ scale: 0.9 }}
+                  whileTap={{ scale: 0.9 }}
                   className="absolute -bottom-4 -right-4 w-12 h-12 rounded-2xl bg-white text-slate-900 flex items-center justify-center transition-all border border-white/60 shadow-2xl"
                 >
                   <Camera className="w-6 h-6" strokeWidth={2.5} />
@@ -133,7 +133,7 @@ export default function Settings() {
               <div className="space-y-6 text-center md:text-left">
                 <motion.button 
                   whileHover={{ scale: 1.05 }}
-                  whileActive={{ scale: 0.95 }}
+                  whileTap={{ scale: 0.95 }}
                   className="px-6 py-3 bg-white/80 border border-white/60 text-slate-900 rounded-full text-sm font-bold tracking-tight transition-all hover:bg-white shadow-xl"
                 >
                   Change Avatar
@@ -182,7 +182,7 @@ export default function Settings() {
             <div className="flex justify-end pt-10 relative z-10">
               <motion.button 
                 whileHover={{ scale: 1.05, y: -5 }}
-                whileActive={{ scale: 0.95 }}
+                whileTap={{ scale: 0.95 }}
                 className="px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full text-base font-bold tracking-tight shadow-xl shadow-indigo-200 transition-all"
               >
                 Save Changes
@@ -287,7 +287,7 @@ export default function Settings() {
                     )}
                     <motion.button 
                       whileHover={{ scale: 1.05 }}
-                      whileActive={{ scale: 0.95 }}
+                      whileTap={{ scale: 0.95 }}
                       className={`px-6 py-3 rounded-full text-sm font-bold tracking-tight transition-all shadow-xl ${
                         lms.connected 
                           ? "bg-white/80 border border-white/60 text-slate-900 hover:bg-white" 
@@ -320,7 +320,7 @@ export default function Settings() {
               </div>
               <motion.button 
                 whileHover={{ scale: 1.05, x: 5 }}
-                whileActive={{ scale: 0.95 }}
+                whileTap={{ scale: 0.95 }}
                 className="px-8 py-3 bg-rose-600 hover:bg-rose-700 text-white rounded-full text-sm font-bold tracking-tight shadow-xl shadow-rose-200 transition-all"
               >
                 Delete Account

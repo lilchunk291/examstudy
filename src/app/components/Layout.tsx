@@ -140,7 +140,7 @@ export default function Layout() {
           <div className="p-5">
             <motion.div 
               whileHover={{ scale: 1.02 }}
-              whileActive={{ scale: 0.98 }}
+              whileTap={{ scale: 0.98 }}
               className="flex items-center gap-4 p-3 rounded-3xl bg-card/40 border border-border shadow-lg backdrop-blur-3xl hover:bg-card/60 transition-all cursor-pointer group"
             >
               {userAvatar ? (
@@ -203,7 +203,7 @@ export default function Layout() {
             </div>
             <motion.button 
               whileHover={{ scale: 1.1, rotate: 5 }}
-              whileActive={{ scale: 0.9 }}
+              whileTap={{ scale: 0.9 }}
               onClick={() => navigate("/app/vault")}
               className="w-12 h-12 flex items-center justify-center rounded-xl bg-card/60 backdrop-blur-3xl border border-border text-muted-foreground hover:bg-card hover:text-accent-primary transition-all shadow-lg"
             >
@@ -211,7 +211,7 @@ export default function Layout() {
             </motion.button>
             <motion.button 
               whileHover={{ scale: 1.1, rotate: -5 }}
-              whileActive={{ scale: 0.9 }}
+              whileTap={{ scale: 0.9 }}
               className="w-12 h-12 flex items-center justify-center rounded-xl bg-card/60 backdrop-blur-3xl border border-border text-muted-foreground hover:bg-card hover:text-accent-primary transition-all shadow-lg relative"
             >
               <Bell strokeWidth={2.5} className="w-5 h-5" />
@@ -219,7 +219,7 @@ export default function Layout() {
             </motion.button>
             <motion.button 
               whileHover={{ scale: 1.1 }}
-              whileActive={{ scale: 0.9 }}
+              whileTap={{ scale: 0.9 }}
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
               className="w-12 h-12 flex items-center justify-center rounded-xl bg-card/60 backdrop-blur-3xl border border-border text-muted-foreground hover:bg-card hover:text-accent-primary transition-all shadow-lg"
             >
@@ -231,7 +231,7 @@ export default function Layout() {
             </motion.button>
             <motion.div 
               whileHover={{ scale: 1.1 }}
-              whileActive={{ scale: 0.9 }}
+              whileTap={{ scale: 0.9 }}
               onClick={() => navigate("/app/settings")}
               className="w-12 h-12 rounded-xl border-2 border-border shadow-lg cursor-pointer hover:shadow-accent-primary/20 transition-all overflow-hidden" 
             >

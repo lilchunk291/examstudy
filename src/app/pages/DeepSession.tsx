@@ -30,6 +30,7 @@ import {
 import { useNavigate } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
 import { toast } from "sonner";
+import { getSupabase } from "../../lib/supabase";
 
 interface FocusSession {
   id: string;
@@ -55,8 +56,10 @@ const AMBIENT_SOUNDS: AmbientSound[] = [
 export default function Focus() {
   const navigate = useNavigate();
   const [isActive, setIsActive] = useState(false);
-  const [initialTime] = useState(45 * 60); // 45 minutes
-  const [time, setTime] = useState(initialTime);
+  const [workTime] = useState(45 * 60);
+  const [breakTime] = useState(15 * 60);
+  const [mode, setMode] = useState<'work' | 'break'>('work');
+  const [time, setTime] = useState(workTime);
   const [isFinished, setIsFinished] = useState(false);
   
   // Goal tracking state
@@ -167,7 +170,9 @@ export default function Focus() {
       
       interval = setInterval(() => {
         setTime((t) => t - 1);
-        setTotalDuration((d) => d + 1);
+        if (mode === 'work') {
+          setTotalDuration((d) => d + 1);
+        }
       }, 1000);
 
       // Play audio if native
@@ -181,16 +186,19 @@ export default function Focus() {
         const end = new Date();
         setEndTime(end);
 
-        // Save to history
-        const newSession: FocusSession = {
-          id: Date.now().toString(),
-          title: "Advanced Calculus • Block 2 of 4",
-          date: end.toISOString(),
-          duration: totalDuration + 1,
-        };
-        setHistory(prev => [newSession, ...prev]);
-
-        toast.success("Focus session complete!");
+        if (mode === 'work') {
+          // Save to history
+          const newSession: FocusSession = {
+            id: Date.now().toString(),
+            title: sessionGoal || "Deep Focus Session",
+            date: end.toISOString(),
+            duration: totalDuration + 1,
+          };
+          setHistory(prev => [newSession, ...prev]);
+          toast.success("Focus session complete!");
+        } else {
+          toast.success("Break complete! Ready to focus?");
+        }
       }
       
       // Pause audio
@@ -199,7 +207,7 @@ export default function Focus() {
       }
     }
     return () => clearInterval(interval);
-  }, [isActive, time, startTime, totalDuration, audioSource, currentSoundId]);
+  }, [isActive, time, startTime, totalDuration, audioSource, currentSoundId, mode, sessionGoal]);
 
   // Handle volume changes
   useEffect(() => {
@@ -242,7 +250,7 @@ export default function Focus() {
 
   const handleReset = useCallback(() => {
     setIsActive(false);
-    setTime(initialTime);
+    setTime(mode === 'work' ? workTime : breakTime);
     setTotalDuration(0);
     setStartTime(null);
     if (audioRef.current) {
@@ -250,7 +258,33 @@ export default function Focus() {
       audioRef.current.currentTime = 0;
     }
     toast.info("Timer reset");
-  }, [initialTime]);
+  }, [mode, workTime, breakTime]);
+
+  const toggleMode = () => {
+    const newMode = mode === 'work' ? 'break' : 'work';
+    setMode(newMode);
+    setTime(newMode === 'work' ? workTime : breakTime);
+    setIsActive(false);
+    toast.info(`Switched to ${newMode} mode`);
+  };
+
+  const importFromStudyPlan = async () => {
+    try {
+      const supabase = getSupabase();
+      const { data, error } = await supabase.from('study_nodes').select('*').limit(1);
+      if (error) throw error;
+      if (data && data.length > 0) {
+        setSessionGoal(data[0].label);
+        setIsGoalEditing(false);
+        toast.success("Imported from Study Plan");
+      } else {
+        toast.error("No study plan found");
+      }
+    } catch (error) {
+      console.error("Error importing from study plan:", error);
+      toast.error("Failed to import study plan");
+    }
+  };
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -263,7 +297,8 @@ export default function Focus() {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  const progress = ((initialTime - time) / initialTime) * 100;
+  const currentInitialTime = mode === 'work' ? workTime : breakTime;
+  const progress = ((currentInitialTime - time) / currentInitialTime) * 100;
 
   const containerVariants = {
     initial: { opacity: 0 },
@@ -302,7 +337,7 @@ export default function Focus() {
         <div className="flex items-center gap-12">
           <motion.button 
             whileHover={{ scale: 1.1, x: -10 }}
-            whileActive={{ scale: 0.9 }}
+            whileTap={{ scale: 0.9 }}
             onClick={() => navigate("/app")}
             className="w-12 h-12 flex items-center justify-center rounded-xl bg-card/40 backdrop-blur-3xl border border-border text-muted-foreground hover:text-foreground transition-all shadow-xl"
           >
@@ -310,14 +345,25 @@ export default function Focus() {
           </motion.button>
           <div className="space-y-4">
             <h1 className="text-3xl font-black tracking-tight text-foreground leading-tight drop-shadow-sm">Deep Focus</h1>
-            <p className="text-base font-semibold text-muted-foreground tracking-tight max-w-3xl leading-relaxed">Session: Advanced Calculus • Block 2 of 4</p>
+            <div className="flex items-center gap-4">
+              <p className="text-base font-semibold text-muted-foreground tracking-tight max-w-3xl leading-relaxed">Session: Advanced Calculus • Block 2 of 4</p>
+              <div className="h-4 w-px bg-border" />
+              <button 
+                onClick={toggleMode}
+                className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
+                  mode === 'work' ? "bg-accent-primary/10 text-accent-primary" : "bg-emerald-500/10 text-emerald-600"
+                }`}
+              >
+                {mode === 'work' ? "Work Mode" : "Break Mode"}
+              </button>
+            </div>
           </div>
         </div>
         
         <div className="flex items-center gap-8">
           <motion.button 
             whileHover={{ scale: 1.05, y: -5 }}
-            whileActive={{ scale: 0.95 }}
+            whileTap={{ scale: 0.95 }}
             className="flex items-center gap-6 px-6 py-3 bg-card/40 backdrop-blur-3xl border border-border rounded-full text-sm font-black uppercase tracking-widest text-muted-foreground hover:bg-card/60 hover:text-foreground transition-all shadow-xl"
           >
             <Settings strokeWidth={4} className="w-6 h-6" />
@@ -325,7 +371,7 @@ export default function Focus() {
           </motion.button>
           <motion.button 
             whileHover={{ scale: 1.05, y: -5 }}
-            whileActive={{ scale: 0.95 }}
+            whileTap={{ scale: 0.95 }}
             onClick={handleEndSession}
             className="flex items-center gap-6 px-6 py-3 bg-rose-500 text-white rounded-full text-sm font-black uppercase tracking-widest hover:bg-rose-600 transition-all shadow-xl shadow-rose-200"
           >
@@ -368,28 +414,44 @@ export default function Focus() {
                     cx="250"
                     cy="250"
                     r="230"
-                    stroke="var(--accent-primary)"
+                    stroke={mode === 'work' ? "var(--accent-primary)" : "#10b981"}
                     strokeWidth="12"
                     fill="transparent"
                     strokeDasharray={230 * 2 * Math.PI}
                     animate={{ strokeDashoffset: (230 * 2 * Math.PI) * (1 - progress / 100) }}
                     transition={{ duration: 1, ease: "linear" }}
                     strokeLinecap="round"
-                    className="drop-shadow-[0_0_15px_var(--accent-primary)]"
+                    className={mode === 'work' ? "drop-shadow-[0_0_15px_var(--accent-primary)]" : "drop-shadow-[0_0_15px_#10b981]"}
                   />
                 </svg>
               </div>
 
               <div className="relative z-20">
+                <div className="flex items-center justify-center gap-4 mb-4">
+                  <button 
+                    onClick={() => setMode('work')}
+                    className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${mode === 'work' ? 'bg-accent-primary text-white shadow-lg' : 'bg-card/60 text-muted-foreground hover:text-foreground'}`}
+                  >
+                    Work
+                  </button>
+                  <button 
+                    onClick={() => setMode('break')}
+                    className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${mode === 'break' ? 'bg-emerald-500 text-white shadow-lg' : 'bg-card/60 text-muted-foreground hover:text-foreground'}`}
+                  >
+                    Break
+                  </button>
+                </div>
                 <motion.h2 
-                  key={time}
+                  key={`${time}-${mode}`}
                   initial={{ scale: 0.9, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
-                  className="text-[10rem] leading-none font-black text-foreground tracking-tighter drop-shadow-2xl select-none tabular-nums group-hover:scale-105 transition-transform duration-700"
+                  className={`text-[10rem] leading-none font-black tracking-tighter drop-shadow-2xl select-none tabular-nums group-hover:scale-105 transition-transform duration-700 ${mode === 'work' ? 'text-foreground' : 'text-emerald-600'}`}
                 >
                   {formatTime(time)}
                 </motion.h2>
-                <p className="text-sm font-black uppercase tracking-[0.4em] text-muted-foreground select-none mt-4">Minutes Remaining in Block</p>
+                <p className="text-sm font-black uppercase tracking-[0.4em] text-muted-foreground select-none mt-4">
+                  {mode === 'work' ? 'Minutes Remaining in Block' : 'Relaxation Time'}
+                </p>
               </div>
             </div>
             
@@ -433,14 +495,23 @@ export default function Focus() {
                 </div>
                 <h3 className="text-lg font-black text-foreground tracking-tight">Session Goal</h3>
               </div>
-              {!isGoalEditing && sessionGoal && (
+              <div className="flex items-center gap-2">
                 <button 
-                  onClick={() => setIsGoalEditing(true)}
-                  className="p-2 hover:bg-card/60 rounded-xl transition-all text-muted-foreground hover:text-foreground"
+                  onClick={importFromStudyPlan}
+                  className="p-2 hover:bg-card/60 rounded-xl transition-all text-muted-foreground hover:text-accent-primary"
+                  title="Import from Study Plan"
                 >
-                  <Edit2 strokeWidth={3} className="w-5 h-5" />
+                  <Zap strokeWidth={3} className="w-5 h-5" />
                 </button>
-              )}
+                {!isGoalEditing && sessionGoal && (
+                  <button 
+                    onClick={() => setIsGoalEditing(true)}
+                    className="p-2 hover:bg-card/60 rounded-xl transition-all text-muted-foreground hover:text-foreground"
+                  >
+                    <Edit2 strokeWidth={3} className="w-5 h-5" />
+                  </button>
+                )}
+              </div>
             </div>
             
             <div className="flex-1">
@@ -794,7 +865,7 @@ export default function Focus() {
                   whileTap={{ scale: 0.98 }}
                   onClick={() => {
                     setIsFinished(false);
-                    setTime(initialTime);
+                    setTime(mode === 'work' ? workTime : breakTime);
                     setStartTime(null);
                     setEndTime(null);
                     setTotalDuration(0);

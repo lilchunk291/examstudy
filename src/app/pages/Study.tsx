@@ -648,7 +648,7 @@ export default function Study() {
                           <span className="text-[10px] font-bold text-slate-400">{s.duration}m</span>
                         </div>
                         <h4 className="text-sm font-bold text-slate-900 mb-1 group-hover:text-indigo-600 transition-colors">{s.title}</h4>
-                        <p className="text-[10px] font-semibold text-slate-500 leading-relaxed">{s.description}</p>
+                        <p className="text-[10px] font-semibold text-slate-500 leading-relaxed whitespace-pre-wrap">{s.description}</p>
                         <div className="mt-4 flex items-center justify-end opacity-0 group-hover:opacity-100 transition-opacity">
                           <Plus className="w-4 h-4 text-indigo-600" />
                         </div>
@@ -860,7 +860,7 @@ export default function Study() {
                   node.color === "rose" ? "text-rose-950" :
                   "text-slate-900"
                 }`}>{node.title}</h3>
-                <p className={`text-sm font-medium leading-relaxed mb-8 relative z-10 opacity-70 ${
+                <p className={`text-sm font-medium leading-relaxed mb-8 relative z-10 opacity-70 whitespace-pre-wrap ${
                   node.color === "indigo" ? "text-indigo-800" :
                   node.color === "emerald" ? "text-emerald-800" :
                   node.color === "violet" ? "text-violet-800" :
@@ -912,7 +912,7 @@ export default function Study() {
                   
                   <motion.button 
                     whileHover={{ scale: 1.1, rotate: 10 }}
-                    whileActive={{ scale: 0.9 }}
+                    whileTap={{ scale: 0.9 }}
                     className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-lg transition-all ${
                       node.color === "indigo" ? "bg-indigo-600 text-white shadow-indigo-200" :
                       node.color === "emerald" ? "bg-emerald-600 text-white shadow-emerald-200" :
@@ -1009,7 +1009,7 @@ export default function Study() {
             onClick={handleDeployStrategy}
             disabled={isDeploying}
             whileHover={{ scale: 1.02 }}
-            whileActive={{ scale: 0.98 }}
+            whileTap={{ scale: 0.98 }}
             className="flex items-center gap-3 px-8 py-3 bg-indigo-600 text-white rounded-2xl font-bold tracking-tight shadow-xl shadow-indigo-100 disabled:opacity-50"
           >
             {isDeploying ? <Loader2 className="w-5 h-5 animate-spin" /> : <Play strokeWidth={3} className="w-4 h-4 fill-current" />}
@@ -1075,7 +1075,7 @@ export default function Study() {
                     }
                   }}
                   whileHover={{ x: -8, scale: 1.02 }}
-                  whileActive={{ scale: 0.95 }}
+                  whileTap={{ scale: 0.95 }}
                   className="bg-slate-50 rounded-[28px] p-6 border border-slate-100 cursor-pointer hover:border-indigo-200 hover:bg-white hover:shadow-xl transition-all group relative overflow-hidden pointer-events-auto"
                 >
               <div className="flex items-center gap-5 mb-4 relative z-10">
@@ -1134,7 +1134,7 @@ export default function Study() {
               }
             }}
             whileHover={{ scale: 1.02 }}
-            whileActive={{ scale: 0.98 }}
+            whileTap={{ scale: 0.98 }}
             className="w-full py-5 bg-slate-900 text-white rounded-[24px] font-bold transition-all flex items-center justify-center gap-4 shadow-2xl shadow-slate-200"
           >
             <Plus strokeWidth={3} className="w-5 h-5" />

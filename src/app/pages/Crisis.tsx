@@ -46,7 +46,7 @@ export default function Crisis() {
   const cardVariants = {
     initial: { opacity: 0, y: 20 },
     animate: { opacity: 1, y: 0 },
-    hover: { scale: 1.02, transition: { type: "spring", stiffness: 300, damping: 20 } }
+    hover: { scale: 1.02, transition: { type: "spring" as const, stiffness: 300, damping: 20 } }
   };
 
   return (
@@ -85,7 +85,7 @@ export default function Crisis() {
           </div>
           <motion.button 
             whileHover={{ scale: 1.05 }}
-            whileActive={{ scale: 0.95 }}
+            whileTap={{ scale: 0.95 }}
             className="px-8 py-3 bg-rose-600 hover:bg-rose-700 text-white rounded-full text-base font-bold tracking-tight shadow-xl shadow-rose-200 transition-all"
           >
             Deactivate Protocol
@@ -170,7 +170,7 @@ export default function Crisis() {
           </div>
           <motion.button 
             whileHover={{ scale: 1.05 }}
-            whileActive={{ scale: 0.95 }}
+            whileTap={{ scale: 0.95 }}
             className="px-6 py-3 bg-white/80 border border-white/60 text-slate-900 rounded-full text-sm font-bold tracking-tight flex items-center gap-4 hover:bg-white transition-all shadow-lg"
           >
             <Download className="w-5 h-5" strokeWidth={2.5} />

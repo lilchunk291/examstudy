@@ -207,7 +207,7 @@ export default function Register() {
               <motion.button
                 type="submit"
                 whileHover={{ scale: 1.02 }}
-                whileActive={{ scale: 0.98 }}
+                whileTap={{ scale: 0.98 }}
                 className="w-full flex items-center justify-center gap-3 py-4 px-8 border border-transparent rounded-2xl shadow-xl text-base font-bold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 transition-all"
               >
                 Create Account

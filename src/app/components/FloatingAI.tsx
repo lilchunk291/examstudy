@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { 
   MessageSquare, 
   X, 
@@ -141,7 +143,11 @@ export default function FloatingAI() {
                           ? "bg-indigo-600 text-white rounded-tr-none border-indigo-500 shadow-indigo-100/50" 
                           : "bg-white/80 border-white/40 text-slate-800 rounded-tl-none"
                       }`}>
-                        <p className="whitespace-pre-wrap">{msg.content}</p>
+                        <div className="markdown-body">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {msg.content}
+                          </ReactMarkdown>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -197,7 +203,7 @@ export default function FloatingAI() {
 
       <motion.button
         whileHover={{ scale: 1.1, rotate: 5 }}
-        whileActive={{ scale: 0.9 }}
+        whileTap={{ scale: 0.9 }}
         onClick={() => setIsOpen(!isOpen)}
         className={`w-16 h-16 rounded-[24px] flex items-center justify-center shadow-2xl transition-all relative group ${
           isOpen ? "bg-white text-indigo-600 border border-white/40" : "bg-indigo-600 text-white shadow-indigo-200/50"
