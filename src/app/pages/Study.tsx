@@ -360,22 +360,6 @@ export default function Study() {
       if (data && data.length > 0) {
         setNodes(data);
         if (isManual) toast.success("Canvas Refreshed");
-      } else {
-        console.log("No nodes found in DB, inserting defaults...");
-        const initialNodes = [
-          { title: "Calculus III", description: "Multi-variable differentiation and integration strategies for engineering applications.", type: "Core Module v1.0", status: "Active Session", color: "indigo", x: -250, y: 0 },
-          { title: "Exam Mastery", description: "Final comprehensive review with 95% proficiency target for upcoming finals.", type: "Target Objective", status: "95%", color: "amber", x: 250, y: 0 }
-        ];
-        const { data: inserted, error: insertError } = await supabase.from('study_nodes').insert(initialNodes).select();
-        if (insertError) {
-           console.error("Insert error:", insertError);
-           setNodes(initialNodes.map((n, i) => ({ ...n, id: `local-${i}` })));
-           if (isManual) toast.success("Loaded local fallback nodes");
-        } else if (inserted) {
-           console.log("Inserted nodes:", inserted.length);
-           setNodes(inserted);
-           if (isManual) toast.success("Initialized default nodes");
-        }
       }
     } catch (error) {
       console.error("Error in loadNodes:", error);

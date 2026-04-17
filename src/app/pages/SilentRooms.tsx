@@ -42,30 +42,6 @@ export default function SilentRooms() {
             hasMeetingLink: 'meeting_link' in data[0],
             hasPlatform: 'platform' in data[0]
           });
-        } else {
-          // Fallback initial data if empty
-          const initialRooms = [
-            { name: "Advanced Calculus Deep Work", subject: "Math", active_users: 12, max_users: 20, is_locked: false },
-            { name: "Quiet Library - No Chat", subject: "Focus", active_users: 45, max_users: 100, is_locked: false },
-            { name: "Physics Lab Study Group", subject: "Physics", active_users: 8, max_users: 15, is_locked: true },
-          ];
-          
-          // Try to insert with meeting links, if it fails, try without
-          const { data: inserted, error: insertError } = await supabase.from('silent_rooms').insert(initialRooms.map(r => ({
-            ...r,
-            platform: 'google',
-            meeting_link: 'https://meet.google.com'
-          }))).select();
-
-          if (insertError) {
-            // Fallback to basic insert
-            const { data: basicInserted } = await supabase.from('silent_rooms').insert(initialRooms).select();
-            if (basicInserted) setRooms(basicInserted);
-            setDbSchema({ hasMeetingLink: false, hasPlatform: false });
-          } else if (inserted) {
-            setRooms(inserted);
-            setDbSchema({ hasMeetingLink: true, hasPlatform: true });
-          }
         }
       } catch (error) {
         console.error("Error fetching rooms:", error);

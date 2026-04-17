@@ -26,8 +26,6 @@ self.addEventListener('message', async (event) => {
 
       // Using a highly optimized, small model for browser execution
       generator = await pipeline('text-generation', modelId, {
-        dtype: 'q4', // 4-bit quantization to save memory and bandwidth
-        device: 'wasm', // Use WebAssembly for maximum compatibility
         progress_callback: (progressInfo: any) => {
           self.postMessage({ status: 'progress', progress: progressInfo });
         }

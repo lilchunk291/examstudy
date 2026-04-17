@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, MouseEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { GoogleGenAI } from "@google/genai";
 import { 
   Plus, 
   MoreHorizontal,
@@ -31,6 +30,7 @@ import { format, addDays, startOfWeek, eachDayOfInterval, isSameDay, addHours, s
 import { getSupabase } from "../../lib/supabase";
 import FocusMode from "../components/FocusMode";
 import { toast } from "sonner";
+import { generateSchedule } from "../../services/scheduleGenerator";
 
 type Event = {
   id: string;
@@ -48,7 +48,7 @@ type Event = {
   reminderTime?: string;
 };
 
-type Task = {
+export type Task = {
   id: string;
   title: string;
   priority: string;
@@ -58,19 +58,11 @@ type Task = {
   reminderTime?: string;
 };
 
-// Mock data for initial state
-const INITIAL_EVENTS: Event[] = [
-  { id: "1", title: "Advanced Algorithms", type: "Deep Work", color: "indigo", start: new Date(2026, 8, 17, 9, 0), duration: 150, icon: Zap },
-  { id: "2", title: "Lunch & Rest", type: "Break", color: "slate", start: new Date(2026, 8, 17, 12, 30), duration: 60, icon: Clock },
-  { id: "3", title: "LMS Sync: BioTech", type: "Sync", color: "emerald", start: new Date(2026, 8, 17, 14, 0), duration: 90, icon: LayoutGrid },
-  { id: "4", title: "Neural Networks", type: "Deep Work", color: "violet", start: new Date(2026, 8, 17, 16, 0), duration: 120, icon: Brain }
-];
-
 export default function Schedule() {
   const navigate = useNavigate();
   const [currentDate, setCurrentDate] = useState(new Date(2026, 8, 17));
   const [view, setView] = useState<"day" | "week" | "month">("week");
-  const [events, setEvents] = useState<Event[]>(INITIAL_EVENTS);
+  const [events, setEvents] = useState<Event[]>([]);
   const [scheduleSearchQuery, setScheduleSearchQuery] = useState("");
   const [isAiPanelOpen, setIsAiPanelOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -101,6 +93,8 @@ export default function Schedule() {
   const [taskToConfirm, setTaskToConfirm] = useState<{id: string, status: boolean} | null>(null);
   const [aiSuggestions, setAiSuggestions] = useState<any[]>([]);
   const [eventToDelete, setEventToDelete] = useState<string | null>(null);
+  const [taskFilter, setTaskFilter] = useState<"all" | "pending" | "completed">("all");
+  const [taskSort, setTaskSort] = useState<"priority" | "dueDate" | "title">("priority");
   const [targetHours, setTargetHours] = useState(() => {
     const saved = localStorage.getItem("target_hours");
     return saved ? parseInt(saved) : 8;
@@ -116,11 +110,7 @@ export default function Schedule() {
   const [quickEventTitle, setQuickEventTitle] = useState("");
   const [dailyGoals, setDailyGoals] = useState<{id: string, title: string, completed: boolean}[]>(() => {
     const saved = localStorage.getItem("daily_goals");
-    return saved ? JSON.parse(saved) : [
-      { id: "g1", title: "Study for 4 hours", completed: false },
-      { id: "g2", title: "Complete Calculus homework", completed: false },
-      { id: "g3", title: "Review flashcards", completed: true }
-    ];
+    return saved ? JSON.parse(saved) : [];
   });
 
   useEffect(() => {
@@ -189,11 +179,7 @@ export default function Schedule() {
   };
   const [isGeneratingSuggestions, setIsGeneratingSuggestions] = useState(false);
   const [isPrioritizing, setIsPrioritizing] = useState(false);
-  const [tasks, setTasks] = useState<Task[]>([
-    { id: "t1", title: "Review Calculus Notes", priority: "high", completed: false, dueDate: "2026-09-18" },
-    { id: "t2", title: "Submit Bio Assignment", priority: "medium", completed: true, dueDate: "2026-09-17" },
-    { id: "t3", title: "Read Ethics Chapter 4", priority: "low", completed: false, dueDate: "2026-09-20" },
-  ]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [breakTimer, setBreakTimer] = useState({ seconds: 300, isActive: false, mode: 'break' as 'work' | 'break' });
@@ -428,14 +414,30 @@ export default function Schedule() {
     return () => clearInterval(intervalId);
   }, [tasks]);
 
-  // Sort tasks: uncompleted first, then by priority, then by due date
-  const sortedTasks = [...tasks].sort((a, b) => {
-    if (a.completed !== b.completed) return a.completed ? 1 : -1;
-    const priorityWeight = { high: 3, medium: 2, low: 1 };
-    if (priorityWeight[a.priority as keyof typeof priorityWeight] !== priorityWeight[b.priority as keyof typeof priorityWeight]) {
-      return priorityWeight[b.priority as keyof typeof priorityWeight] - priorityWeight[a.priority as keyof typeof priorityWeight];
+  // Sort and Filter tasks
+  const filteredTasks = tasks.filter(task => {
+    if (taskFilter === "pending") return !task.completed;
+    if (taskFilter === "completed") return task.completed;
+    return true;
+  });
+
+  const sortedTasks = [...filteredTasks].sort((a, b) => {
+    if (taskSort === "priority") {
+      const priorityWeight = { high: 3, medium: 2, low: 1 };
+      const weightA = priorityWeight[a.priority as keyof typeof priorityWeight] || 0;
+      const weightB = priorityWeight[b.priority as keyof typeof priorityWeight] || 0;
+      if (weightA !== weightB) return weightB - weightA;
+    } else if (taskSort === "dueDate") {
+      if (!a.dueDate) return 1;
+      if (!b.dueDate) return -1;
+      return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+    } else if (taskSort === "title") {
+      return a.title.localeCompare(b.title);
     }
-    return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+    
+    // Default fallback: uncompleted first
+    if (a.completed !== b.completed) return a.completed ? 1 : -1;
+    return 0;
   });
 
   // Calendar logic
@@ -602,66 +604,74 @@ export default function Schedule() {
 
   const generateWeeklyPlan = async () => {
     setIsGenerating(true);
-    setGenerationStep("Analyzing weekly goals...");
+    setGenerationStep("Initializing CSP Constraints...");
     
     try {
-      const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
-
-      const prompt = `
-        You are an elite academic advisor. Create a comprehensive weekly study plan for a student.
-        
-        User Goals: ${aiConfig.studyGoals}
-        Topics: ${aiConfig.topics}
-        Learning Style: ${aiConfig.learningStyle}
-        Target Hours per Day: ${aiConfig.targetHours}
-        
-        Current Tasks:
-        ${JSON.stringify(tasks.filter(t => !t.completed).map(t => ({ title: t.title, priority: t.priority, dueDate: t.dueDate })), null, 2)}
-        
-        Generate a list of study sessions for the next 7 days starting from ${format(new Date(), "yyyy-MM-dd")}.
-        Each session should have:
-        - title: Specific and actionable
-        - type: "Deep Work", "Sync", or "Break"
-        - color: "indigo", "emerald", "violet", "amber", or "rose"
-        - start_time: ISO string
-        - duration_minutes: number (30, 60, 90, 120, or 180)
-        - reason: Why this session is scheduled at this time
-        
-        Return a JSON array of session objects. Only return the JSON array.
-      `;
-
+      // Simulate processing time for UX
+      await new Promise(resolve => setTimeout(resolve, 800));
+      setGenerationStep("Running RL Agent (Q-Learning)...");
+      await new Promise(resolve => setTimeout(resolve, 800));
       setGenerationStep("Synthesizing study blocks...");
-      const result = await genAI.models.generateContent({
-        model: "gemini-1.5-flash",
-        contents: [{ role: "user", parts: [{ text: prompt }] }]
-      });
-      const text = result.text;
-      
-      const cleanedText = text.replace(/```json|```/g, '').trim();
-      const plan = JSON.parse(cleanedText);
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      const plan = generateSchedule(tasks, aiConfig, new Date());
 
       setGenerationStep("Finalizing schedule...");
       
-      const mappedSuggestions = plan.map((s: any, idx: number) => ({
-        id: `plan-${Date.now()}-${idx}`,
+      const newEvents = plan.map((s: any) => ({
         title: s.title,
         type: s.type,
         color: s.color,
-        start: new Date(s.start_time),
-        duration: s.duration_minutes,
-        reason: s.reason,
-        icon: Sparkles
+        start_time: s.start_time,
+        duration_minutes: s.duration_minutes,
+        icon_name: 'Sparkles',
+        goal: s.reason
       }));
 
-      setAiSuggestions(mappedSuggestions);
+      try {
+        const supabase = getSupabase();
+        const { data, error } = await supabase.from('events').insert(newEvents).select();
+        
+        if (error) throw error;
+        
+        const mappedEvents = data.map(e => ({
+          id: e.id,
+          title: e.title,
+          type: e.type,
+          color: e.color,
+          start: new Date(e.start_time),
+          duration: e.duration_minutes,
+          icon: Sparkles,
+          icon_name: 'Sparkles',
+          goal: e.goal,
+          goalAchieved: e.goal_achieved
+        }));
+        
+        setEvents([...events, ...mappedEvents]);
+      } catch (error) {
+        console.error("Error adding AI events:", error);
+        // Fallback
+        const fallbackEvents = newEvents.map((e, i) => ({
+          id: `ai-${Date.now()}-${i}`,
+          title: e.title,
+          type: e.type,
+          color: e.color,
+          start: new Date(e.start_time),
+          duration: e.duration_minutes,
+          icon: Sparkles,
+          goal: e.goal
+        }));
+        setEvents([...events, ...fallbackEvents]);
+      }
+
       setIsAiPanelOpen(false);
       toast.success("Weekly Plan Generated", {
-        description: "Review the AI suggestions in the Mission Control panel.",
+        description: "Your calendar has been populated with the optimized schedule.",
       });
     } catch (error) {
       console.error("Error generating weekly plan:", error);
       toast.error("Plan Generation Failed", {
-        description: "Could not connect to AI service. Please try again later.",
+        description: "An error occurred while generating the plan.",
       });
     } finally {
       setIsGenerating(false);
@@ -836,6 +846,23 @@ export default function Schedule() {
     }
   };
 
+  const updateEventTime = async (eventId: string, newStart: Date) => {
+    const originalEvents = [...events];
+    setEvents(events.map(ev => ev.id === eventId ? { ...ev, start: newStart } : ev));
+    
+    try {
+      const supabase = getSupabase();
+      if (!eventId.toString().startsWith('m-') && !eventId.toString().startsWith('ai-')) {
+        await supabase.from('events').update({ start_time: newStart.toISOString() }).eq('id', eventId);
+      }
+      toast.success("Schedule updated");
+    } catch (error) {
+      console.error("Error updating event time:", error);
+      setEvents(originalEvents);
+      toast.error("Failed to update schedule");
+    }
+  };
+
   const openEditTask = (task: any) => {
     setSelectedTask(task);
     setNewTask({
@@ -915,37 +942,33 @@ export default function Schedule() {
     setIsPrioritizing(true);
     
     try {
-      const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+      // Simulate processing time for UX
+      await new Promise(resolve => setTimeout(resolve, 800));
 
-      const prompt = `
-        You are an expert productivity coach. I have a list of tasks with their current priorities and due dates.
-        Please re-prioritize them to optimize my focus and ensure I meet all deadlines.
+      const now = new Date();
+      const newPriorities = tasks.map(task => {
+        const dueDate = new Date(task.dueDate);
+        const diffTime = dueDate.getTime() - now.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
         
-        Current Tasks:
-        ${JSON.stringify(tasks.map(t => ({ id: t.id, title: t.title, priority: t.priority, dueDate: t.dueDate })), null, 2)}
-        
-        Return a JSON array of objects with the task 'id' and the new 'priority' (high, medium, or low).
-        Only return the JSON array, no other text.
-      `;
+        let newPriority = "low";
+        if (diffDays <= 2) {
+          newPriority = "high";
+        } else if (diffDays <= 5) {
+          newPriority = "medium";
+        }
 
-      const result = await genAI.models.generateContent({
-        model: "gemini-1.5-flash",
-        contents: [{ role: "user", parts: [{ text: prompt }] }]
+        return { id: task.id, priority: newPriority };
       });
-      const text = result.text;
-      
-      // Clean the response text (remove markdown code blocks if present)
-      const cleanedText = text.replace(/```json|```/g, '').trim();
-      const newPriorities = JSON.parse(cleanedText);
 
       const updatedTasks = tasks.map(task => {
         const update = newPriorities.find((p: any) => p.id === task.id);
-        return update ? { ...task, priority: update.priority } : task;
+        return update ? { ...task, priority: update.priority as "high" | "medium" | "low" } : task;
       });
 
       setTasks(updatedTasks);
       toast.success("Tasks Re-prioritized", {
-        description: "AI has optimized your task priorities based on deadlines.",
+        description: "Local heuristic agent has optimized your task priorities based on deadlines.",
       });
 
       // Update in Supabase
@@ -958,7 +981,7 @@ export default function Schedule() {
     } catch (error) {
       console.error("Error prioritizing tasks:", error);
       toast.error("Prioritization Failed", {
-        description: "Could not connect to AI service. Please try again later.",
+        description: "An error occurred while prioritizing tasks.",
       });
     } finally {
       setIsPrioritizing(false);
@@ -1523,12 +1546,22 @@ export default function Schedule() {
                           <motion.div
                             key={event.id}
                             drag
-                            dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
-                            dragElastic={0.1}
-                            onDragEnd={(_, info) => {
-                              // Simple drag feedback, real persistence would need coordinate mapping
-                              if (Math.abs(info.offset.y) > 20) {
-                                toast.info("Drag & Drop: Event time updated (Simulated)");
+                            dragSnapToOrigin={true}
+                            onDragEnd={(e, info) => {
+                              const hourOffset = Math.round(info.offset.y / 40) * 0.5; // 80px per hour, snap to 30 mins
+                              
+                              const target = e.target as HTMLElement;
+                              const column = target.closest('.flex-1') as HTMLElement;
+                              const columnWidth = column ? column.offsetWidth : 0;
+                              const dayOffset = columnWidth > 0 ? Math.round(info.offset.x / columnWidth) : 0;
+
+                              if (hourOffset !== 0 || dayOffset !== 0) {
+                                const newStart = new Date(event.start);
+                                newStart.setHours(newStart.getHours() + Math.floor(hourOffset));
+                                newStart.setMinutes(newStart.getMinutes() + (hourOffset % 1) * 60);
+                                newStart.setDate(newStart.getDate() + dayOffset);
+                                
+                                updateEventTime(event.id, newStart);
                               }
                             }}
                             initial={{ opacity: 0, y: 10 }}

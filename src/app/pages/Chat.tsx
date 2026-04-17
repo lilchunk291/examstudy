@@ -2,6 +2,15 @@ import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import Whiteboard from "../components/Whiteboard";
+
+declare global {
+  interface Window {
+    puter: any;
+  }
+}
+
+const puter = typeof window !== 'undefined' ? window.puter : null;
 import { 
   Send, 
   Paperclip, 
@@ -48,10 +57,16 @@ import {
   Cpu,
   Search,
   Globe,
-  Workflow
+  Workflow,
+  MoreVertical,
+  Settings2,
+  Palette,
+  History,
+  Trash
 } from "lucide-react";
 
 import { GoogleGenAI } from "@google/genai";
+import { API_CONFIG, getApiUrl } from "../../lib/config";
 import { getSupabase } from "../../lib/supabase";
 import { ChatRLAgent, ChatState } from "../../lib/chatAgent";
 
@@ -149,6 +164,9 @@ export default function Chat() {
   const availableModels = [
     { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash", type: "cloud", provider: "Google", icon: Cloud },
     { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro", type: "cloud", provider: "Google", icon: Cloud },
+    { id: "gpt-4o", name: "GPT-4o", type: "puter", provider: "OpenAI", icon: Zap },
+    { id: "claude-3-5-sonnet", name: "Claude 3.5 Sonnet", type: "puter", provider: "Anthropic", icon: Zap },
+    { id: "grok-beta", name: "Grok Beta", type: "puter", provider: "xAI", icon: Zap },
     { id: "onnx-community/Llama-3.2-1B-Instruct", name: "Llama 3.2 (1B)", type: "local", provider: "Meta", icon: ShieldCheck },
     { id: "Xenova/Qwen1.5-0.5B-Chat", name: "Qwen 1.5 (0.5B)", type: "local", provider: "Alibaba", icon: ShieldCheck },
     { id: "Xenova/TinyLlama-1.1B-Chat-v1.0", name: "TinyLlama (1.1B)", type: "local", provider: "TinyLlama", icon: ShieldCheck },
@@ -157,6 +175,16 @@ export default function Chat() {
   // AI Model State
   const [selectedModelId, setSelectedModelId] = useState<string>("gemini-2.5-flash");
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isWhiteboardOpen, setIsWhiteboardOpen] = useState(false);
+  const [chatSettings, setChatSettings] = useState({
+    temperature: 0.7,
+    maxTokens: 2048,
+    topP: 1,
+    theme: "system",
+    showAnalysis: true
+  });
+
   const [localModelStatus, setLocalModelStatus] = useState<"idle" | "loading" | "finetuning" | "ready" | "error">("idle");
   const [localModelProgress, setLocalModelProgress] = useState<number>(0);
   const workerRef = useRef<Worker | null>(null);
@@ -350,6 +378,15 @@ export default function Chat() {
               timestamp: new Date(payload.new.created_at)
             }];
           });
+        } else if (payload.eventType === 'UPDATE') {
+          setMessages(current => current.map(m => m.id === payload.new.id ? {
+            id: payload.new.id,
+            type: payload.new.role as "user" | "ai",
+            content: payload.new.content,
+            timestamp: new Date(payload.new.created_at)
+          } : m));
+        } else if (payload.eventType === 'DELETE') {
+          setMessages(current => current.filter(m => m.id !== payload.old.id));
         }
       })
       .subscribe();
@@ -452,11 +489,44 @@ export default function Chat() {
     handleModelSelect(modelId);
   };
 
-  const conversations = [
+  const [conversations, setConversations] = useState([
     { id: 1, title: "Calculus Exam Prep", time: "2m ago", active: true },
     { id: 2, title: "History Essay Ideas", time: "1h ago", active: false },
     { id: 3, title: "Physics Lab Report", time: "Yesterday", active: false },
-  ];
+  ]);
+
+  const createNewChat = () => {
+    const newConv = {
+      id: Date.now(),
+      title: "New Conversation",
+      time: "Just now",
+      active: true
+    };
+    setConversations(prev => [newConv, ...prev.map(c => ({ ...c, active: false }))]);
+    setMessages([]);
+  };
+
+  const switchConversation = (id: number) => {
+    setConversations(prev => prev.map(c => ({ ...c, active: c.id === id })));
+    setMessages([]);
+  };
+
+  const deleteConversation = (id: number) => {
+    setConversations(prev => prev.filter(c => c.id !== id));
+    if (conversations.find(c => c.id === id)?.active) {
+      setMessages([]);
+    }
+  };
+
+  const clearChat = async () => {
+    try {
+      const supabase = getSupabase();
+      await supabase.from('chat_messages').delete().neq('id', 0); // Delete all
+      setMessages([]);
+    } catch (error) {
+      console.error("Error clearing chat:", error);
+    }
+  };
 
   const handleSend = async () => {
     if ((!input.trim() && attachedFiles.length === 0) || isLoading) return;
@@ -516,6 +586,27 @@ export default function Chat() {
       const aiMessageId = Date.now() + 1;
       setMessages(prev => [...prev, { id: aiMessageId, type: "ai", content: "", timestamp: new Date() }]);
 
+      if (API_CONFIG.useLocalBackend) {
+        try {
+          const response = await fetch(getApiUrl('/api/chat'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              messages: messages.map(m => ({ role: m.type, content: m.content })),
+              model: currentModel.id
+            })
+          });
+          const data = await response.json();
+          setMessages(prev => prev.map(m => m.id === aiMessageId ? { ...m, content: data.content } : m));
+          await supabase.from('chat_messages').insert([{ role: 'ai', content: data.content }]);
+          setIsLoading(false);
+          return;
+        } catch (error) {
+          console.error("Local backend error:", error);
+          // Fallback to direct BaaS if local backend fails
+        }
+      }
+
       if (currentModel.type === "cloud") {
         const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
         
@@ -565,33 +656,66 @@ export default function Chat() {
         await supabase.from('chat_messages').insert([{ role: 'ai', content: fullText }]);
         setIsLoading(false);
 
+      } else if (currentModel.type === "puter") {
+        // Puter.js Cloud Models
+        const puterInstance = window.puter;
+        if (!puterInstance) {
+          throw new Error("Puter.js is not loaded. Please check your connection.");
+        }
+        
+        // Puter.ai.chat returns a string directly if not streaming, or an async iterable if streaming.
+        // To be safe and ensure it works, we'll use stream: false for now, or handle the string response.
+        const response = await puterInstance.ai.chat(userMessageContent, { 
+          model: currentModel.id,
+          stream: false
+        });
+
+        let fullText = "";
+        if (typeof response === 'string') {
+          fullText = response;
+        } else if (response && response.message && response.message.content) {
+          fullText = response.message.content;
+        } else if (response && response.text) {
+          fullText = response.text;
+        } else {
+          fullText = String(response);
+        }
+
+        setMessages(prev => prev.map(m => m.id === aiMessageId ? { ...m, content: fullText } : m));
+        await supabase.from('chat_messages').insert([{ role: 'ai', content: fullText }]);
+        setIsLoading(false);
       } else {
         // Local Model Inference
         if (!workerRef.current || localModelStatus !== 'ready') {
           throw new Error("Local model is not ready yet.");
         }
 
-        const handleWorkerMessage = async (e: MessageEvent) => {
-          const { status, result, error } = e.data;
-          
-          if (status === 'complete') {
-            setMessages(prev => prev.map(m => m.id === aiMessageId ? { ...m, content: result } : m));
-            await supabase.from('chat_messages').insert([{ role: 'ai', content: result }]);
-            setIsLoading(false);
-            workerRef.current?.removeEventListener('message', handleWorkerMessage);
-          } else if (status === 'error') {
-            throw new Error(error);
-          }
-        };
+        await new Promise<void>((resolve, reject) => {
+          const handleWorkerMessage = async (e: MessageEvent) => {
+            const { status, result, error } = e.data;
+            
+            if (status === 'complete') {
+              setMessages(prev => prev.map(m => m.id === aiMessageId ? { ...m, content: result } : m));
+              await supabase.from('chat_messages').insert([{ role: 'ai', content: result }]);
+              workerRef.current?.removeEventListener('message', handleWorkerMessage);
+              resolve();
+            } else if (status === 'error') {
+              console.error("Worker Generation Error:", error);
+              setMessages(prev => prev.map(m => m.id === aiMessageId ? { ...m, content: "Sorry, I encountered an error generating the response." } : m));
+              workerRef.current?.removeEventListener('message', handleWorkerMessage);
+              reject(new Error(error));
+            }
+          };
 
-        workerRef.current.addEventListener('message', handleWorkerMessage);
+          workerRef.current!.addEventListener('message', handleWorkerMessage);
 
-        workerRef.current.postMessage({
-          type: 'generate',
-          text: userMessageContent,
-          systemPrompt: systemInstruction,
-          modelId: currentModel.id,
-          messages: messages.map(m => ({ role: m.type === "user" ? "user" : "assistant", content: m.content }))
+          workerRef.current!.postMessage({
+            type: 'generate',
+            text: userMessageContent,
+            systemPrompt: systemInstruction,
+            modelId: currentModel.id,
+            messages: messages.map(m => ({ role: m.type === "user" ? "user" : "assistant", content: m.content }))
+          });
         });
       }
 
@@ -628,7 +752,10 @@ export default function Chat() {
             className="flex flex-col bg-white/40 backdrop-blur-3xl border-r border-white/50 overflow-hidden shrink-0"
           >
             <div className="p-4">
-              <button className="w-full flex items-center justify-between px-4 py-3 bg-white/60 border border-white/50 rounded-2xl text-sm font-bold hover:bg-white/80 transition-all shadow-lg hover:shadow-xl">
+              <button 
+                onClick={createNewChat}
+                className="w-full flex items-center justify-between px-4 py-3 bg-white/60 border border-white/50 rounded-2xl text-sm font-bold hover:bg-white/80 transition-all shadow-lg hover:shadow-xl"
+              >
                 <div className="flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-indigo-600" />
                   <span className="text-indigo-900">New chat</span>
@@ -642,6 +769,7 @@ export default function Chat() {
               {conversations.map((conv) => (
                 <div 
                   key={conv.id}
+                  onClick={() => switchConversation(conv.id)}
                   className={`flex items-center gap-3 px-4 py-3 rounded-2xl cursor-pointer transition-all group ${
                     conv.active ? "bg-white/80 shadow-md border border-white/50" : "hover:bg-white/50 border border-transparent"
                   }`}
@@ -651,6 +779,12 @@ export default function Chat() {
                       {conv.title}
                     </div>
                   </div>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); deleteConversation(conv.id); }}
+                    className="p-1.5 opacity-0 group-hover:opacity-100 hover:bg-rose-50 hover:text-rose-600 rounded-lg transition-all"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               ))}
             </div>
@@ -725,6 +859,21 @@ export default function Chat() {
                       </button>
                     ))}
 
+                    <div className="px-3 py-2 mt-2 text-[10px] font-black text-slate-400 uppercase tracking-widest border-t border-slate-100">Puter Cloud Models</div>
+                    {allModels.filter(m => m.type === 'puter').map(model => (
+                      <button
+                        key={model.id}
+                        onClick={() => handleModelSelect(model.id)}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${selectedModelId === model.id ? 'bg-amber-50 border border-amber-100' : 'hover:bg-slate-50 border border-transparent'}`}
+                      >
+                        <Zap className={`w-4 h-4 ${selectedModelId === model.id ? 'text-amber-600' : 'text-slate-400'}`} />
+                        <div className="flex flex-col items-start">
+                          <span className={`text-sm font-bold ${selectedModelId === model.id ? 'text-amber-900' : 'text-slate-700'}`}>{model.name}</span>
+                          <span className="text-[10px] font-medium text-slate-500">{model.provider}</span>
+                        </div>
+                      </button>
+                    ))}
+
                     <div className="px-3 py-2 mt-2 text-[10px] font-black text-slate-400 uppercase tracking-widest border-t border-slate-100">Local Models (On-Device)</div>
                     {allModels.filter(m => m.type === 'local').map(model => (
                       <button
@@ -760,6 +909,20 @@ export default function Chat() {
 
           <div className="flex items-center gap-2">
             <button 
+              onClick={() => setIsWhiteboardOpen(true)}
+              className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-white/60 rounded-xl transition-all shadow-sm border border-transparent hover:border-white/50"
+              title="Open Whiteboard"
+            >
+              <PenTool className="w-5 h-5" />
+            </button>
+            <button 
+              onClick={() => setIsSettingsOpen(true)}
+              className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-white/60 rounded-xl transition-all shadow-sm border border-transparent hover:border-white/50"
+              title="Chat Settings"
+            >
+              <Settings2 className="w-5 h-5" />
+            </button>
+            <button 
               onClick={() => setRightPanelOpen(!rightPanelOpen)}
               className={`p-2 rounded-xl transition-all shadow-sm border ${rightPanelOpen ? "text-indigo-600 bg-white/80 border-white/80 shadow-md" : "text-slate-500 hover:text-indigo-600 hover:bg-white/60 border-transparent hover:border-white/50"}`}
               title="Toggle Context Panel"
@@ -768,6 +931,93 @@ export default function Chat() {
             </button>
           </div>
         </header>
+
+        {/* Whiteboard Overlay */}
+        <AnimatePresence>
+          {isWhiteboardOpen && (
+            <Whiteboard onClose={() => setIsWhiteboardOpen(false)} />
+          )}
+        </AnimatePresence>
+
+        {/* Chat Settings Modal */}
+        <AnimatePresence>
+          {isSettingsOpen && (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden border border-white/20"
+              >
+                <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                  <div>
+                    <h2 className="text-2xl font-black text-slate-900 tracking-tight">Chat Settings</h2>
+                    <p className="text-sm font-medium text-slate-500 mt-1">Configure your AI interaction protocol.</p>
+                  </div>
+                  <button onClick={() => setIsSettingsOpen(false)} className="p-3 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-2xl transition-all">
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+
+                <div className="p-8 space-y-8">
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Temperature</label>
+                      <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg">{chatSettings.temperature}</span>
+                    </div>
+                    <input 
+                      type="range" min="0" max="2" step="0.1"
+                      value={chatSettings.temperature}
+                      onChange={(e) => setChatSettings({...chatSettings, temperature: parseFloat(e.target.value)})}
+                      className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                    />
+                    <p className="text-[10px] text-slate-400 font-medium">Higher values make the output more creative, lower values more deterministic.</p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Max Tokens</label>
+                      <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg">{chatSettings.maxTokens}</span>
+                    </div>
+                    <input 
+                      type="range" min="256" max="8192" step="256"
+                      value={chatSettings.maxTokens}
+                      onChange={(e) => setChatSettings({...chatSettings, maxTokens: parseInt(e.target.value)})}
+                      className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-indigo-100 rounded-xl text-indigo-600">
+                        <History className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-sm font-bold text-slate-800">Clear Chat History</div>
+                        <div className="text-[10px] font-medium text-slate-500">Permanently delete all messages in this session.</div>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={clearChat}
+                      className="px-4 py-2 bg-rose-50 text-rose-600 hover:bg-rose-100 text-xs font-bold rounded-xl transition-all"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-8 bg-slate-50/50 border-t border-slate-100 flex justify-end">
+                  <button 
+                    onClick={() => setIsSettingsOpen(false)}
+                    className="px-8 py-3 bg-indigo-600 text-white font-black rounded-2xl shadow-xl shadow-indigo-200 hover:scale-105 transition-all"
+                  >
+                    Apply Settings
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
 
         {/* Messages */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-6 scroll-smooth custom-scrollbar">

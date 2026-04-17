@@ -40,6 +40,7 @@ export default function Dashboard() {
   };
   
   const [tasks, setTasks] = useState<any[]>([]);
+  const [events, setEvents] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [userName, setUserName] = useState<string>("Username");
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
@@ -56,14 +57,19 @@ export default function Dashboard() {
     }
     fetchUser();
 
-    async function fetchTasks() {
+    async function fetchTasksAndEvents() {
       try {
         const supabase = getSupabase();
-        const { data, error } = await supabase.from('tasks').select('*').order('created_at', { ascending: false });
-        if (error) throw error;
+        const [tasksResponse, eventsResponse] = await Promise.all([
+          supabase.from('tasks').select('*').order('created_at', { ascending: false }),
+          supabase.from('events').select('*').order('start_time', { ascending: true })
+        ]);
         
-        if (data) {
-          setTasks(data.map(t => ({
+        if (tasksResponse.error) throw tasksResponse.error;
+        if (eventsResponse.error) throw eventsResponse.error;
+        
+        if (tasksResponse.data) {
+          setTasks(tasksResponse.data.map(t => ({
             id: t.id,
             title: t.title,
             priority: t.priority,
@@ -71,13 +77,26 @@ export default function Dashboard() {
             dueDate: t.due_date
           })));
         }
+
+        if (eventsResponse.data) {
+          setEvents(eventsResponse.data.map(e => ({
+            id: e.id,
+            title: e.title,
+            type: e.type,
+            color: e.color,
+            start: new Date(e.start_time),
+            duration: e.duration_minutes,
+            goal: e.goal,
+            goalAchieved: e.goal_achieved
+          })));
+        }
       } catch (error) {
-        console.error("Error fetching tasks:", error);
+        console.error("Error fetching data:", error);
       } finally {
         setIsLoading(false);
       }
     }
-    fetchTasks();
+    fetchTasksAndEvents();
 
     const supabase = getSupabase();
     const tasksSubscription = supabase
@@ -108,8 +127,43 @@ export default function Dashboard() {
       })
       .subscribe();
 
+    const eventsSubscription = supabase
+      .channel('public:events:dashboard')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, payload => {
+        if (payload.eventType === 'INSERT') {
+          setEvents(current => {
+            if (current.find(e => e.id === payload.new.id)) return current;
+            return [...current, {
+              id: payload.new.id,
+              title: payload.new.title,
+              type: payload.new.type,
+              color: payload.new.color,
+              start: new Date(payload.new.start_time),
+              duration: payload.new.duration_minutes,
+              goal: payload.new.goal,
+              goalAchieved: payload.new.goal_achieved
+            }];
+          });
+        } else if (payload.eventType === 'UPDATE') {
+          setEvents(current => current.map(e => e.id === payload.new.id ? {
+            id: payload.new.id,
+            title: payload.new.title,
+            type: payload.new.type,
+            color: payload.new.color,
+            start: new Date(payload.new.start_time),
+            duration: payload.new.duration_minutes,
+            goal: payload.new.goal,
+            goalAchieved: payload.new.goal_achieved
+          } : e));
+        } else if (payload.eventType === 'DELETE') {
+          setEvents(current => current.filter(e => e.id !== payload.old.id));
+        }
+      })
+      .subscribe();
+
     return () => {
       supabase.removeChannel(tasksSubscription);
+      supabase.removeChannel(eventsSubscription);
     };
   }, []);
 
@@ -356,23 +410,51 @@ export default function Dashboard() {
 
           {/* Heatmap Mockup - Refined */}
           <div className="space-y-6 mb-12">
-            {[1, 2].map(row => (
-              <div key={row} className="flex gap-6 h-16">
-                <motion.div initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ delay: 0.5 + row * 0.1 }} className="flex-1 bg-indigo-500/10 rounded-2xl border border-indigo-500/10 shadow-inner hover:bg-indigo-500/20 transition-colors" />
-                <motion.div initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ delay: 0.6 + row * 0.1 }} className="flex-[2] bg-slate-500/5 rounded-2xl border border-slate-500/10 shadow-inner hover:bg-slate-500/10 transition-colors" />
-                <motion.div initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ delay: 0.7 + row * 0.1 }} className="flex-1 bg-indigo-500/20 rounded-2xl border border-indigo-500/20 shadow-inner hover:bg-indigo-500/30 transition-colors" />
-                <motion.div initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ delay: 0.8 + row * 0.1 }} className="flex-[0.5] bg-emerald-500/10 rounded-2xl border border-emerald-500/10 shadow-inner hover:bg-emerald-500/20 transition-colors" />
-                <motion.div initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ delay: 0.9 + row * 0.1 }} className="flex-1 bg-slate-500/5 rounded-2xl border border-slate-500/10 shadow-inner hover:bg-slate-500/10 transition-colors" />
+            {events.length > 0 ? (
+              <div className="flex gap-2 h-16 w-full">
+                {events.slice(0, 10).map((event, idx) => {
+                  const colorMap: Record<string, string> = {
+                    indigo: "bg-indigo-500/20 border-indigo-500/20 hover:bg-indigo-500/40",
+                    emerald: "bg-emerald-500/20 border-emerald-500/20 hover:bg-emerald-500/40",
+                    violet: "bg-violet-500/20 border-violet-500/20 hover:bg-violet-500/40",
+                    amber: "bg-amber-500/20 border-amber-500/20 hover:bg-amber-500/40",
+                    rose: "bg-rose-500/20 border-rose-500/20 hover:bg-rose-500/40",
+                    slate: "bg-slate-500/20 border-slate-500/20 hover:bg-slate-500/40"
+                  };
+                  const colorClass = colorMap[event.color] || colorMap.slate;
+                  const flexBasis = Math.max(0.5, event.duration / 60); // Scale width by duration
+
+                  return (
+                    <motion.div 
+                      key={event.id}
+                      initial={{ scaleX: 0 }} 
+                      animate={{ scaleX: 1 }} 
+                      transition={{ delay: 0.5 + idx * 0.1 }} 
+                      style={{ flex: flexBasis }}
+                      className={`rounded-2xl border shadow-inner transition-colors relative group ${colorClass}`}
+                    >
+                      <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+                        {event.title} ({event.duration}m)
+                      </div>
+                    </motion.div>
+                  );
+                })}
               </div>
-            ))}
+            ) : (
+              <div className="flex gap-6 h-16 opacity-50">
+                <div className="flex-1 bg-slate-500/10 rounded-2xl border border-slate-500/10" />
+                <div className="flex-[2] bg-slate-500/10 rounded-2xl border border-slate-500/10" />
+                <div className="flex-1 bg-slate-500/10 rounded-2xl border border-slate-500/10" />
+              </div>
+            )}
           </div>
 
           <div className="flex flex-col md:flex-row items-center justify-between gap-8 pt-10 border-t border-white/40">
             <div className="flex flex-wrap justify-center gap-12">
               {[
-                { label: "Computer Science", color: "bg-indigo-500" },
-                { label: "Architecture", color: "bg-emerald-500" },
-                { label: "Philosophy", color: "bg-slate-400" }
+                { label: "Deep Work", color: "bg-indigo-500" },
+                { label: "Sync", color: "bg-emerald-500" },
+                { label: "Break", color: "bg-amber-500" }
               ].map(item => (
                 <div key={item.label} className="flex items-center gap-4">
                   <div className={`w-4 h-4 rounded-full ${item.color} shadow-lg`} />
