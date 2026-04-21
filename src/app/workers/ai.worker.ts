@@ -28,7 +28,8 @@ self.addEventListener('message', async (event) => {
       generator = await pipeline('text-generation', modelId, {
         progress_callback: (progressInfo: any) => {
           self.postMessage({ status: 'progress', progress: progressInfo });
-        }
+        },
+        dtype: 'q4f16' // Ensure we fetch quantized weights (much smaller download)
       });
       
       currentModelId = modelId;

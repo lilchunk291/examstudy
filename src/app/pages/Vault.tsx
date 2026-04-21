@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { 
   Lock, 
@@ -51,6 +51,7 @@ export default function Vault() {
   const [folders, setFolders] = useState<any[]>([]);
   const [recentFiles, setRecentFiles] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -127,16 +128,51 @@ export default function Vault() {
     }
   };
 
-  const handleUploadFile = async () => {
-    const newFile = {
-      name: `Document_${Math.floor(Math.random() * 1000)}.pdf`,
-      type: "pdf",
-      size: `${Math.floor(Math.random() * 10)} MB`,
-      starred: false
-    };
+  const handleUploadFile = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
     try {
       const supabase = getSupabase();
+      
+      const fileExt = file.name.split('.').pop()?.toLowerCase() || '';
+      let typeStr = "unknown";
+      if (['pdf'].includes(fileExt)) typeStr = "pdf";
+      else if (['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'].includes(fileExt)) typeStr = "image";
+      else if (['doc', 'docx'].includes(fileExt)) typeStr = "doc";
+      else if (['xls', 'xlsx', 'csv'].includes(fileExt)) typeStr = "sheet";
+      
+      const newFile: any = {
+        name: file.name,
+        type: typeStr,
+        size: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
+        starred: false
+      };
+
+      try {
+        const filePath = `user_uploads/${Date.now()}_${file.name}`;
+        const { data: storageData, error: storageError } = await supabase.storage
+          .from('vault')
+          .upload(filePath, file);
+        
+        if (!storageError && storageData) {
+           newFile.url = storageData.path;
+        } else if (storageError) {
+          console.warn("Could not upload to storage bucket 'vault'. Saving metadata only.");
+        }
+      } catch (storageException) {
+         console.warn("Storage exception:", storageException);
+      }
+
       await supabase.from('vault_files').insert([newFile]);
+      
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     } catch (error) {
       console.error("Error uploading file:", error);
     }
@@ -198,6 +234,12 @@ export default function Vault() {
           <Upload className="w-6 h-6" strokeWidth={3} />
           Upload Archive
         </motion.button>
+        <input 
+          type="file" 
+          ref={fileInputRef} 
+          onChange={handleFileChange} 
+          className="hidden" 
+        />
       </motion.div>
 
       {/* Search and Filter */}
@@ -278,6 +320,12 @@ export default function Vault() {
                   key={file.id || index}
                   variants={cardVariants}
                   whileHover="hover"
+                  onClick={() => {
+                    if (file.url) {
+                      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://bxtcoslcgepyfjnsiciz.supabase.co';
+                      window.open(`${supabaseUrl}/storage/v1/object/public/vault/${file.url}`, '_blank');
+                    }
+                  }}
                   className="flex items-center gap-8 p-6 rounded-3xl bg-white/40 backdrop-blur-3xl border border-white/20 hover:bg-white/60 hover:shadow-xl transition-all group cursor-pointer"
                 >
                   <div className="w-14 h-14 rounded-2xl bg-white/80 flex items-center justify-center border border-white/60 shadow-inner group-hover:scale-105 transition-transform">

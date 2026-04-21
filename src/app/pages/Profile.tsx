@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { 
   User, 
@@ -20,6 +21,20 @@ import {
 } from "lucide-react";
 
 export default function Profile() {
+  const [notifications, setNotifications] = useState([
+    { label: "Study Reminders", enabled: true },
+    { label: "Break Notifications", enabled: true },
+    { label: "Achievement Alerts", enabled: false },
+    { label: "Weekly Reports", enabled: true },
+    { label: "Crisis Mode Alerts", enabled: true },
+  ]);
+
+  const toggleNotification = (index: number) => {
+    setNotifications(prev => prev.map((item, i) => 
+      i === index ? { ...item, enabled: !item.enabled } : item
+    ));
+  };
+
   const containerVariants = {
     initial: { opacity: 0 },
     animate: {
@@ -160,16 +175,11 @@ export default function Profile() {
           </div>
           
           <div className="space-y-6">
-            {[
-              { label: "Study Reminders", enabled: true },
-              { label: "Break Notifications", enabled: true },
-              { label: "Achievement Alerts", enabled: false },
-              { label: "Weekly Reports", enabled: true },
-              { label: "Crisis Mode Alerts", enabled: true },
-            ].map((setting, index) => (
+            {notifications.map((setting, index) => (
               <div key={index} className="flex items-center justify-between p-4 rounded-2xl bg-white/20 border border-white/40 hover:bg-white/40 transition-all group/toggle shadow-lg">
                 <span className="text-lg font-bold text-slate-700 tracking-tight">{setting.label}</span>
                 <button
+                  onClick={() => toggleNotification(index)}
                   className={`w-16 h-10 rounded-full transition-all relative ${
                     setting.enabled ? "bg-indigo-600 shadow-xl shadow-indigo-200" : "bg-slate-200"
                   }`}

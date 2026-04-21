@@ -4,13 +4,6 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import Whiteboard from "../components/Whiteboard";
 
-declare global {
-  interface Window {
-    puter: any;
-  }
-}
-
-const puter = typeof window !== 'undefined' ? window.puter : null;
 import { 
   Send, 
   Paperclip, 
@@ -68,7 +61,7 @@ import {
 import { GoogleGenAI } from "@google/genai";
 import { API_CONFIG, getApiUrl } from "../../lib/config";
 import { getSupabase } from "../../lib/supabase";
-import { ChatRLAgent, ChatState } from "../../lib/chatAgent";
+import { useAIWorker } from "../../lib/AIWorkerContext";
 
 type Message = {
   id: number;
@@ -80,74 +73,6 @@ type Message = {
 
 type DrawMode = "pen" | "pan" | "rect" | "circle" | "text" | "eraser";
 
-// --- Comprehensive Classical AI Pipeline ---
-
-// 1. Intent Detection Engine (NLP)
-type Intent = "greeting" | "study" | "planning" | "quiz" | "anxiety" | "debate" | "unknown";
-
-const intentKeywords = {
-  greeting: ["hello", "hi", "hey", "konichiwa", "hola", "bonjour", "greetings", "morning", "evening"],
-  study: ["explain", "understand", "concept", "learn", "how does", "what is", "why is", "define"],
-  planning: ["plan", "schedule", "organize", "goal", "target", "study plan", "calendar"],
-  quiz: ["quiz", "test", "question", "practice", "challenge", "exam"],
-  anxiety: ["anxiety", "stressed", "overwhelmed", "help", "motivation", "tired", "giving up"],
-  debate: ["argue", "debate", "evidence", "prove", "disagree", "theory"],
-};
-
-function detectIntent(input: string): Intent {
-  const lowerInput = input.toLowerCase();
-  for (const [intent, keywords] of Object.entries(intentKeywords)) {
-    if (keywords.some((keyword) => lowerInput.includes(keyword))) {
-      return intent as Intent;
-    }
-  }
-  return "unknown"; 
-}
-
-// 2. Fuzzy Logic Emotion Assessment (Zadeh's Fuzzy Sets)
-type EmotionState = { stress: number; motivation: number; fatigue: number };
-
-function assessEmotion(input: string): EmotionState {
-  const lowerInput = input.toLowerCase();
-  let stress = 0.2; 
-  let motivation = 0.5; 
-  let fatigue = 0.1;
-
-  // Trapezoidal membership approximation
-  if (["stressed", "panic", "fail"].some(w => lowerInput.includes(w))) stress = Math.min(1, stress + 0.6);
-  if (["overwhelmed", "hard", "stuck"].some(w => lowerInput.includes(w))) stress = Math.min(1, stress + 0.4);
-  
-  if (["ready", "excited", "let's go"].some(w => lowerInput.includes(w))) motivation = Math.min(1, motivation + 0.4);
-  
-  if (["tired", "exhausted", "sleepy"].some(w => lowerInput.includes(w))) fatigue = Math.min(1, fatigue + 0.7);
-
-  return { stress, motivation, fatigue };
-}
-
-// 3. Argumentation Theory Framework (Dung's Preferred Semantics)
-function evaluateArguments(topic: string): string {
-  return `Based on Argumentation Theory, I've constructed an argument graph for '${topic}'. While there's evidence supporting A, the counter-argument B holds more weight under Dung's Preferred Semantics due to stronger foundational axioms.`;
-}
-
-// 4. Dempster-Shafer Evidence Theory
-function combineEvidence(sources: string[]): string {
-  return `Using Dempster-Shafer theory to combine evidence from ${sources.length} sources, the belief function strongly indicates this is the optimal approach, with a high plausibility score and low conflict mass.`;
-}
-
-// 5. Q-Learning Agent (Study Action Optimization)
-function getOptimalStudyAction(state: string): string {
-  const actions = ["Active Recall", "Spaced Repetition", "Feynman Technique", "Pomodoro Session"];
-  const optimalAction = actions[Math.floor(Math.random() * actions.length)];
-  return `My Q-Learning agent suggests '${optimalAction}' as the optimal state-action value for your current cognitive load and exam proximity.`;
-}
-
-// 6. Hierarchical Task Network (HTN) Planning
-function generateHTNPlan(goal: string): string {
-  return `I've used an HTN Planner to decompose your goal '${goal}' into primitive tasks: 1. Review core concepts (20m), 2. Practice problems (30m), 3. Self-assessment (10m).`;
-}
-
-// -------------------------------------
-
 export default function Chat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -158,15 +83,14 @@ export default function Chat() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const [isPlusMenuOpen, setIsPlusMenuOpen] = useState(false);
-  const [currentChatTitle, setCurrentChatTitle] = useState("Calculus Exam Prep");
+  const [currentChatTitle, setCurrentChatTitle] = useState("New Conversation");
 
   // Models Configuration
   const availableModels = [
     { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash", type: "cloud", provider: "Google", icon: Cloud },
     { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro", type: "cloud", provider: "Google", icon: Cloud },
-    { id: "gpt-4o", name: "GPT-4o", type: "puter", provider: "OpenAI", icon: Zap },
-    { id: "claude-3-5-sonnet", name: "Claude 3.5 Sonnet", type: "puter", provider: "Anthropic", icon: Zap },
-    { id: "grok-beta", name: "Grok Beta", type: "puter", provider: "xAI", icon: Zap },
+    { id: "onnx-community/gemma-4-E4B-it-ONNX", name: "Gemma 4 (4B)", type: "local", provider: "Google", icon: ShieldCheck },
+    { id: "onnx-community/gemma-4-E2B-it-ONNX", name: "Gemma 4 (2B)", type: "local", provider: "Google", icon: ShieldCheck },
     { id: "onnx-community/Llama-3.2-1B-Instruct", name: "Llama 3.2 (1B)", type: "local", provider: "Meta", icon: ShieldCheck },
     { id: "Xenova/Qwen1.5-0.5B-Chat", name: "Qwen 1.5 (0.5B)", type: "local", provider: "Alibaba", icon: ShieldCheck },
     { id: "Xenova/TinyLlama-1.1B-Chat-v1.0", name: "TinyLlama (1.1B)", type: "local", provider: "TinyLlama", icon: ShieldCheck },
@@ -185,9 +109,7 @@ export default function Chat() {
     showAnalysis: true
   });
 
-  const [localModelStatus, setLocalModelStatus] = useState<"idle" | "loading" | "finetuning" | "ready" | "error">("idle");
-  const [localModelProgress, setLocalModelProgress] = useState<number>(0);
-  const workerRef = useRef<Worker | null>(null);
+  const { status: localModelStatus, progress: localModelProgress, loadModel, currentModelId, generateText } = useAIWorker();
 
   // Hugging Face Search State
   const [isModelHubOpen, setIsModelHubOpen] = useState(false);
@@ -396,65 +318,13 @@ export default function Chat() {
     };
   }, []);
 
-  // Initialize Local AI Worker
-  useEffect(() => {
-    if (!workerRef.current) {
-      workerRef.current = new Worker(new URL('../workers/ai.worker.ts', import.meta.url), { type: 'module' });
-      
-      workerRef.current.addEventListener('message', (e) => {
-        const { status, progress, result, error } = e.data;
-        
-        if (status === 'loading') setLocalModelStatus('loading');
-        if (status === 'progress') {
-          if (progress && progress.progress) {
-            setLocalModelProgress(Math.round(progress.progress));
-          }
-        }
-        if (status === 'ready') {
-          // Enter fine-tuning/adaptation phase
-          setLocalModelStatus('finetuning');
-          
-          // Simulate context injection and prompt alignment (In-Context Fine-Tuning)
-          setTimeout(() => {
-            setLocalModelStatus('ready');
-            setMessages(prev => [...prev, {
-              id: Date.now(),
-              type: "ai",
-              content: `[System] Model weights loaded. Contextual fine-tuning complete. I am now optimized for StudyVault tasks, including Q-Learning scheduling and NLP intent analysis. How can I help you study?`,
-              timestamp: new Date()
-            }]);
-          }, 3000);
-        }
-        if (status === 'error') {
-          console.error("Local Model Error:", error);
-          setLocalModelStatus('error');
-        }
-      });
-    }
-
-    return () => {
-      if (workerRef.current) {
-        workerRef.current.terminate();
-        workerRef.current = null;
-      }
-    };
-  }, []);
-
-  const loadLocalModel = (modelId: string) => {
-    if (workerRef.current) {
-      setLocalModelStatus('loading');
-      setLocalModelProgress(0);
-      workerRef.current.postMessage({ type: 'load', modelId });
-    }
-  };
-
   const handleModelSelect = (modelId: string) => {
     setSelectedModelId(modelId);
     setIsModelDropdownOpen(false);
     
     const model = allModels.find(m => m.id === modelId);
     if (model?.type === "local") {
-      loadLocalModel(modelId);
+      loadModel(modelId);
     }
   };
 
@@ -489,11 +359,7 @@ export default function Chat() {
     handleModelSelect(modelId);
   };
 
-  const [conversations, setConversations] = useState([
-    { id: 1, title: "Calculus Exam Prep", time: "2m ago", active: true },
-    { id: 2, title: "History Essay Ideas", time: "1h ago", active: false },
-    { id: 3, title: "Physics Lab Report", time: "Yesterday", active: false },
-  ]);
+  const [conversations, setConversations] = useState<{ id: number; title: string; time: string; active: boolean; }[]>([]);
 
   const createNewChat = () => {
     const newConv = {
@@ -557,31 +423,8 @@ export default function Chat() {
       // Save to Supabase
       await supabase.from('chat_messages').insert([{ role: 'user', content: userMessageContent + (filesToSend.length > 0 ? ` [Attached ${filesToSend.length} files]` : "") }]);
 
-      const intent = detectIntent(userMessageContent);
-      const emotion = assessEmotion(userMessageContent);
-      
-      // Use RL Agent to determine strategy
-      const chatAgent = new ChatRLAgent();
-      const agentState: ChatState = {
-        intent,
-        stress: emotion.stress,
-        motivation: emotion.motivation,
-        fatigue: emotion.fatigue,
-        messageHistoryLength: messages.length
-      };
-      
-      const rlStrategy = await chatAgent.optimizeStrategy(agentState, userMessageContent);
-
       const systemInstruction = `You are the AI Architect, a highly advanced, privacy-first study assistant. 
-      Your tone is technical, efficient, and encouraging. 
-      Local analysis has detected:
-      - Intent: ${intent}
-      - Emotional State: Stress=${emotion.stress.toFixed(2)}, Motivation=${emotion.motivation.toFixed(2)}, Fatigue=${emotion.fatigue.toFixed(2)}
-      - RL Agent Recommended Strategy: ${rlStrategy}
-      
-      Use this context to tailor your response. If stress is high, be more supportive. If motivation is high, be more challenging. 
-      Always reference your 'classical algorithms' (Dung's Preferred Semantics, Dempster-Shafer theory, HTN Planning) when explaining your reasoning.
-      Crucially, follow the RL Agent Recommended Strategy. If it suggests a quiz, offer a quiz. If it suggests a break, suggest a break.`;
+      Your tone is technical, efficient, and encouraging.`;
 
       const aiMessageId = Date.now() + 1;
       setMessages(prev => [...prev, { id: aiMessageId, type: "ai", content: "", timestamp: new Date() }]);
@@ -656,75 +499,34 @@ export default function Chat() {
         await supabase.from('chat_messages').insert([{ role: 'ai', content: fullText }]);
         setIsLoading(false);
 
-      } else if (currentModel.type === "puter") {
-        // Puter.js Cloud Models
-        const puterInstance = window.puter;
-        if (!puterInstance) {
-          throw new Error("Puter.js is not loaded. Please check your connection.");
-        }
-        
-        // Puter.ai.chat returns a string directly if not streaming, or an async iterable if streaming.
-        // To be safe and ensure it works, we'll use stream: false for now, or handle the string response.
-        const response = await puterInstance.ai.chat(userMessageContent, { 
-          model: currentModel.id,
-          stream: false
-        });
-
-        let fullText = "";
-        if (typeof response === 'string') {
-          fullText = response;
-        } else if (response && response.message && response.message.content) {
-          fullText = response.message.content;
-        } else if (response && response.text) {
-          fullText = response.text;
-        } else {
-          fullText = String(response);
-        }
-
-        setMessages(prev => prev.map(m => m.id === aiMessageId ? { ...m, content: fullText } : m));
-        await supabase.from('chat_messages').insert([{ role: 'ai', content: fullText }]);
-        setIsLoading(false);
       } else {
         // Local Model Inference
-        if (!workerRef.current || localModelStatus !== 'ready') {
-          throw new Error("Local model is not ready yet.");
+        if (localModelStatus !== 'ready') {
+          throw new Error(`Local model is not ready yet. Status: ${localModelStatus}`);
         }
 
-        await new Promise<void>((resolve, reject) => {
-          const handleWorkerMessage = async (e: MessageEvent) => {
-            const { status, result, error } = e.data;
-            
-            if (status === 'complete') {
-              setMessages(prev => prev.map(m => m.id === aiMessageId ? { ...m, content: result } : m));
-              await supabase.from('chat_messages').insert([{ role: 'ai', content: result }]);
-              workerRef.current?.removeEventListener('message', handleWorkerMessage);
-              resolve();
-            } else if (status === 'error') {
-              console.error("Worker Generation Error:", error);
-              setMessages(prev => prev.map(m => m.id === aiMessageId ? { ...m, content: "Sorry, I encountered an error generating the response." } : m));
-              workerRef.current?.removeEventListener('message', handleWorkerMessage);
-              reject(new Error(error));
-            }
-          };
+        const localMessages = messages.map(m => ({ 
+          role: m.type === "user" ? "user" : "assistant", 
+          content: m.content 
+        }));
 
-          workerRef.current!.addEventListener('message', handleWorkerMessage);
-
-          workerRef.current!.postMessage({
-            type: 'generate',
-            text: userMessageContent,
-            systemPrompt: systemInstruction,
-            modelId: currentModel.id,
-            messages: messages.map(m => ({ role: m.type === "user" ? "user" : "assistant", content: m.content }))
-          });
-        });
+        try {
+          const result = await generateText(userMessageContent, systemInstruction, localMessages);
+          setMessages(prev => prev.map(m => m.id === aiMessageId ? { ...m, content: result } : m));
+          await supabase.from('chat_messages').insert([{ role: 'ai', content: result }]);
+        } catch (error: any) {
+          console.error("Worker Generation Error:", error);
+          setMessages(prev => prev.map(m => m.id === aiMessageId ? { ...m, content: "Sorry, I encountered an error generating the response." } : m));
+          throw error;
+        }
       }
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("AI Error:", error);
       const errorMessage: Message = {
         id: Date.now() + 1,
         type: "ai",
-        content: "Neural link interrupted. Please check your connection or try again later.",
+        content: `Error: ${error?.message || "Neural link interrupted. Please check your connection or try again later."}`,
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, errorMessage]);
@@ -854,21 +656,6 @@ export default function Chat() {
                         <Cloud className={`w-4 h-4 ${selectedModelId === model.id ? 'text-indigo-600' : 'text-slate-400'}`} />
                         <div className="flex flex-col items-start">
                           <span className={`text-sm font-bold ${selectedModelId === model.id ? 'text-indigo-900' : 'text-slate-700'}`}>{model.name}</span>
-                          <span className="text-[10px] font-medium text-slate-500">{model.provider}</span>
-                        </div>
-                      </button>
-                    ))}
-
-                    <div className="px-3 py-2 mt-2 text-[10px] font-black text-slate-400 uppercase tracking-widest border-t border-slate-100">Puter Cloud Models</div>
-                    {allModels.filter(m => m.type === 'puter').map(model => (
-                      <button
-                        key={model.id}
-                        onClick={() => handleModelSelect(model.id)}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${selectedModelId === model.id ? 'bg-amber-50 border border-amber-100' : 'hover:bg-slate-50 border border-transparent'}`}
-                      >
-                        <Zap className={`w-4 h-4 ${selectedModelId === model.id ? 'text-amber-600' : 'text-slate-400'}`} />
-                        <div className="flex flex-col items-start">
-                          <span className={`text-sm font-bold ${selectedModelId === model.id ? 'text-amber-900' : 'text-slate-700'}`}>{model.name}</span>
                           <span className="text-[10px] font-medium text-slate-500">{model.provider}</span>
                         </div>
                       </button>
@@ -1024,7 +811,7 @@ export default function Chat() {
           
           {/* Local Model Loading Indicator */}
           <AnimatePresence>
-            {currentModel.type === "local" && (localModelStatus === "loading" || localModelStatus === "finetuning") && (
+            {currentModel.type === "local" && localModelStatus === "loading" && (
               <motion.div 
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -1035,26 +822,19 @@ export default function Chat() {
                   <Loader2 className="w-5 h-5 animate-spin" />
                   <div className="flex flex-col">
                     <div className="text-sm font-bold">
-                      {localModelStatus === "loading" ? `Downloading ${currentModel.name}...` : `Fine-tuning ${currentModel.name}...`}
+                      {`Downloading ${currentModel.name}...`}
                     </div>
-                    {localModelStatus === "finetuning" && (
-                      <div className="text-[10px] font-medium text-emerald-600 uppercase tracking-wider mt-0.5">
-                        Injecting StudyVault Context & Algorithms
-                      </div>
-                    )}
                   </div>
                 </div>
-                {localModelStatus === "loading" && (
-                  <div className="flex items-center gap-3">
-                    <div className="w-32 h-2 bg-emerald-200 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-emerald-500 transition-all duration-300" 
-                        style={{ width: `${localModelProgress}%` }}
-                      />
-                    </div>
-                    <span className="text-xs font-bold text-emerald-600 w-8">{localModelProgress}%</span>
+                <div className="flex items-center gap-3">
+                  <div className="w-32 h-2 bg-emerald-200 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-emerald-500 transition-all duration-300" 
+                      style={{ width: `${localModelProgress}%` }}
+                    />
                   </div>
-                )}
+                  <span className="text-xs font-bold text-emerald-600 w-8">{localModelProgress}%</span>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
@@ -1259,40 +1039,6 @@ export default function Chat() {
                   ) : (
                     <div className="text-xs font-medium text-slate-500 text-center py-2">No files attached in this session.</div>
                   )}
-                  <div className="flex items-start gap-3">
-                    <div className="p-2 bg-emerald-100 rounded-lg">
-                      <Calendar className="w-4 h-4 text-emerald-600" />
-                    </div>
-                    <div>
-                      <div className="text-sm font-bold text-slate-800">Upcoming Exam</div>
-                      <div className="text-xs font-medium text-slate-500">Math 201 • Tomorrow, 9:00 AM</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* AI Analysis */}
-              <div className="space-y-3">
-                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Real-time Analysis</h4>
-                <div className="p-4 bg-white/60 backdrop-blur-md border border-white/50 rounded-2xl shadow-lg space-y-5">
-                  <div>
-                    <div className="flex justify-between text-xs mb-2">
-                      <span className="font-bold text-slate-600">Cognitive Load</span>
-                      <span className="font-black text-rose-600">High</span>
-                    </div>
-                    <div className="h-2 bg-white/50 rounded-full overflow-hidden shadow-inner">
-                      <div className="h-full bg-rose-500 w-3/4 rounded-full shadow-sm" />
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-xs mb-2">
-                      <span className="font-bold text-slate-600">Focus Level</span>
-                      <span className="font-black text-emerald-600">Optimal</span>
-                    </div>
-                    <div className="h-2 bg-white/50 rounded-full overflow-hidden shadow-inner">
-                      <div className="h-full bg-emerald-500 w-4/5 rounded-full shadow-sm" />
-                    </div>
-                  </div>
                 </div>
               </div>
 

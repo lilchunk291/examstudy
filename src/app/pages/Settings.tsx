@@ -144,11 +144,11 @@ export default function Settings() {
 
             <div className="grid gap-8 relative z-10">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="space-y-4">
+                 <div className="space-y-4">
                   <label className="text-xs font-bold text-slate-400 uppercase tracking-[0.3em] ml-4">First Name</label>
                   <input 
                     type="text" 
-                    defaultValue="John"
+                    placeholder="First Name"
                     className="w-full px-6 py-3 bg-white/40 backdrop-blur-md border border-white/60 rounded-2xl text-base font-bold text-slate-900 focus:outline-none focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 transition-all shadow-sm group-hover:bg-white/60"
                   />
                 </div>
@@ -156,7 +156,7 @@ export default function Settings() {
                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em] ml-4">Last Name</label>
                   <input 
                     type="text" 
-                    defaultValue="Doe"
+                    placeholder="Last Name"
                     className="w-full px-6 py-3 bg-white/40 backdrop-blur-md border border-white/60 rounded-2xl text-base font-bold text-slate-900 focus:outline-none focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 transition-all shadow-sm group-hover:bg-white/60"
                   />
                 </div>
@@ -165,7 +165,7 @@ export default function Settings() {
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em] ml-4">Email Address</label>
                 <input 
                   type="email" 
-                  defaultValue="john.doe@example.com"
+                  placeholder="name@example.com"
                   className="w-full px-6 py-3 bg-white/40 backdrop-blur-md border border-white/60 rounded-2xl text-base font-bold text-slate-900 focus:outline-none focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 transition-all shadow-sm group-hover:bg-white/60"
                 />
               </div>
@@ -173,7 +173,7 @@ export default function Settings() {
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em] ml-4">Bio</label>
                 <textarea 
                   rows={4}
-                  defaultValue="Computer Science student passionate about AI and machine learning."
+                  placeholder="Tell us about yourself..."
                   className="w-full px-6 py-3 bg-white/40 backdrop-blur-md border border-white/60 rounded-2xl text-base font-bold text-slate-900 focus:outline-none focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 transition-all resize-none shadow-sm group-hover:bg-white/60"
                 />
               </div>

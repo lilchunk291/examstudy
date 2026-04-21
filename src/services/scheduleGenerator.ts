@@ -4,6 +4,7 @@ export interface AIConfig {
   intensity: string;
   targetHours: number;
   topics: string;
+  prioritizeBacklogs?: boolean;
 }
 
 export interface GeneratedEvent {
@@ -34,18 +35,24 @@ export const generateSchedule = (
   // RL Agent State
   let currentFatigue = 0;
 
+  // Sort tasks by priority (Simulating Q-value exploitation) globally for the week
+  const availableTasks = [...uncompletedTasks].sort((a, b) => {
+     let weightA = a.priority === 'high' ? 3 : a.priority === 'medium' ? 2 : 1;
+     let weightB = b.priority === 'high' ? 3 : b.priority === 'medium' ? 2 : 1;
+     
+     if (aiConfig.prioritizeBacklogs) {
+       if (a.isBacklog) weightA += 5;
+       if (b.isBacklog) weightB += 5;
+     }
+     
+     return weightB - weightA;
+  });
+
   // Generate 7 days of schedule
   for (let i = 0; i < 7; i++) {
     let dailyHoursAllocated = 0;
     let currentHour = 9; // Start at 9 AM
     currentFatigue = 0; // Reset fatigue each day
-    
-    // Sort tasks by priority (Simulating Q-value exploitation)
-    const availableTasks = [...uncompletedTasks].sort((a, b) => {
-       const weightA = a.priority === 'high' ? 3 : a.priority === 'medium' ? 2 : 1;
-       const weightB = b.priority === 'high' ? 3 : b.priority === 'medium' ? 2 : 1;
-       return weightB - weightA;
-    });
 
     while (dailyHoursAllocated < aiConfig.targetHours && currentHour < 20) {
       // RL Policy: If fatigue is too high, take a break
@@ -70,8 +77,25 @@ export const generateSchedule = (
       
       // CSP Constraint: Fit session into available time
       const task = availableTasks.length > 0 ? availableTasks.shift() : null;
-      const topic = topicsList[Math.floor(Math.random() * topicsList.length)];
-      const title = task ? `Focus: ${task.title}` : `Deep Dive: ${topic}`;
+      let topic = topicsList[Math.floor(Math.random() * topicsList.length)];
+      
+      let title = "";
+      let color = "indigo";
+      let reason = "";
+
+      if (task) {
+        title = task.isBacklog && aiConfig.prioritizeBacklogs ? `[BACKLOG] ${task.title}` : `Focus: ${task.title}`;
+        color = task.isBacklog ? 'rose' : (task.priority === 'high' ? 'amber' : 'indigo');
+        reason = task.isBacklog 
+          ? "Urgent: Scheduled Arrear/Backlog clearance session to recover course credits."
+          : "CSP matched high-priority task to optimal energy window.";
+
+        if (task.isBacklog) currentFatigue += 15; // Extra mental fatigue for backlogs
+      } else {
+        title = `Deep Dive: ${topic}`;
+        color = 'indigo';
+        reason = `RL exploration: Scheduled ${topic} to balance knowledge graph.`;
+      }
       
       const sessionStart = new Date(startDate);
       sessionStart.setDate(sessionStart.getDate() + i);
@@ -79,13 +103,11 @@ export const generateSchedule = (
       
       plan.push({
          title,
-         type: aiConfig.intensity,
-         color: task ? (task.priority === 'high' ? 'rose' : 'amber') : 'indigo',
+         type: task?.isBacklog ? "Catch-Up Mode" : aiConfig.intensity,
+         color,
          start_time: sessionStart.toISOString(),
          duration_minutes: baseDuration,
-         reason: task 
-            ? `CSP matched high-priority task to optimal energy window.` 
-            : `RL exploration: Scheduled ${topic} to balance knowledge graph.`
+         reason
       });
       
       currentHour += (baseDuration / 60);

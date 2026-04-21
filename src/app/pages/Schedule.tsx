@@ -56,18 +56,19 @@ export type Task = {
   dueDate: string;
   reminderType?: string;
   reminderTime?: string;
+  isBacklog?: boolean;
 };
 
 export default function Schedule() {
   const navigate = useNavigate();
-  const [currentDate, setCurrentDate] = useState(new Date(2026, 8, 17));
+  const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<"day" | "week" | "month">("week");
   const [events, setEvents] = useState<Event[]>([]);
   const [scheduleSearchQuery, setScheduleSearchQuery] = useState("");
   const [isAiPanelOpen, setIsAiPanelOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationStep, setGenerationStep] = useState("");
-  const [aiConfig, setAiConfig] = useState({ targetHours: 6, intensity: "Balanced", learningStyle: "Visual", examType: "MCQ", studyGoals: "", topics: "" });
+  const [aiConfig, setAiConfig] = useState({ targetHours: 6, intensity: "Balanced", learningStyle: "Visual", examType: "MCQ", studyGoals: "", topics: "", prioritizeBacklogs: false });
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [newSession, setNewSession] = useState({ 
@@ -86,8 +87,8 @@ export default function Schedule() {
   
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<any>(null);
-  const [dbSchema, setDbSchema] = useState<{ hasMeetingLink: boolean; hasPlatform: boolean }>({ hasMeetingLink: true, hasPlatform: true });
-  const [newTask, setNewTask] = useState({ title: "", priority: "medium", dueDate: format(new Date(), "yyyy-MM-dd"), reminderType: "none", reminderTime: "09:00" });
+  const [dbSchema, setDbSchema] = useState<{ hasMeetingLink: boolean; hasPlatform: boolean; hasTaskBacklog: boolean }>({ hasMeetingLink: true, hasPlatform: true, hasTaskBacklog: false });
+  const [newTask, setNewTask] = useState({ title: "", priority: "medium", dueDate: format(new Date(), "yyyy-MM-dd"), reminderType: "none", reminderTime: "09:00", isBacklog: false });
   const [activeFocusSession, setActiveFocusSession] = useState<any>(null);
   const [taskToDelete, setTaskToDelete] = useState<string | null>(null);
   const [taskToConfirm, setTaskToConfirm] = useState<{id: string, status: boolean} | null>(null);
@@ -244,7 +245,9 @@ export default function Schedule() {
         if (tasksResponse.error) throw tasksResponse.error;
         if (eventsResponse.error) throw eventsResponse.error;
 
+        let hasTaskBacklog = false;
         if (tasksResponse.data && tasksResponse.data.length > 0) {
+          hasTaskBacklog = 'is_backlog' in tasksResponse.data[0];
           setTasks(tasksResponse.data.map(t => ({
             id: t.id,
             title: t.title,
@@ -252,7 +255,8 @@ export default function Schedule() {
             completed: t.completed,
             dueDate: t.due_date,
             reminderType: t.reminder_type || 'none',
-            reminderTime: t.reminder_time || '09:00'
+            reminderTime: t.reminder_time || '09:00',
+            isBacklog: t.is_backlog || false
           })));
         }
 
@@ -278,8 +282,11 @@ export default function Schedule() {
           // Check schema
           setDbSchema({
             hasMeetingLink: 'meeting_link' in eventsResponse.data[0],
-            hasPlatform: 'platform' in eventsResponse.data[0]
+            hasPlatform: 'platform' in eventsResponse.data[0],
+            hasTaskBacklog: hasTaskBacklog
           });
+        } else {
+          setDbSchema(prev => ({ ...prev, hasTaskBacklog }));
         }
       } catch (error) {
         console.error("Error fetching data from Supabase:", error);
@@ -306,7 +313,8 @@ export default function Schedule() {
               completed: payload.new.completed,
               dueDate: payload.new.due_date,
               reminderType: payload.new.reminder_type || 'none',
-              reminderTime: payload.new.reminder_time || '09:00'
+              reminderTime: payload.new.reminder_time || '09:00',
+              isBacklog: payload.new.is_backlog || false
             }];
           });
         } else if (payload.eventType === 'UPDATE') {
@@ -317,7 +325,8 @@ export default function Schedule() {
             completed: payload.new.completed,
             dueDate: payload.new.due_date,
             reminderType: payload.new.reminder_type || 'none',
-            reminderTime: payload.new.reminder_time || '09:00'
+            reminderTime: payload.new.reminder_time || '09:00',
+            isBacklog: payload.new.is_backlog || false
           } : t));
         } else if (payload.eventType === 'DELETE') {
           setTasks(current => current.filter(t => t.id !== payload.old.id));
@@ -556,9 +565,18 @@ export default function Schedule() {
       // 4. Apply k-consistency to prune the search space and find a valid schedule
       
       const topicPrefix = aiConfig.topics ? aiConfig.topics.split(',')[0].trim() : aiConfig.learningStyle;
+      
+      const today = new Date(currentDate);
+      
+      const event1Start = new Date(today);
+      event1Start.setHours(baseHour, 0, 0, 0);
+      
+      const event2Start = new Date(today);
+      event2Start.setHours(baseHour + 4, 0, 0, 0);
+
       const newAiEvents = [
-        { title: `AI Optimized: ${topicPrefix} Study`, type: "Deep Work", color: "amber", start_time: new Date(2026, 8, 18, baseHour, 0).toISOString(), duration_minutes: duration, icon_name: 'Sparkles' },
-        { title: `AI Optimized: ${aiConfig.examType} Prep`, type: "Deep Work", color: "rose", start_time: new Date(2026, 8, 18, baseHour + 4, 0).toISOString(), duration_minutes: duration, icon_name: 'Sparkles' },
+        { title: `AI Optimized: ${topicPrefix} Study`, type: "Deep Work", color: "amber", start_time: event1Start.toISOString(), duration_minutes: duration, icon_name: 'Sparkles' },
+        { title: `AI Optimized: ${aiConfig.examType} Prep`, type: "Deep Work", color: "rose", start_time: event2Start.toISOString(), duration_minutes: duration, icon_name: 'Sparkles' },
       ];
       
       try {
@@ -870,7 +888,8 @@ export default function Schedule() {
       priority: task.priority,
       dueDate: task.dueDate,
       reminderType: task.reminderType || 'none',
-      reminderTime: task.reminderTime || '09:00'
+      reminderTime: task.reminderTime || '09:00',
+      isBacklog: task.isBacklog || false
     });
     setIsTaskModalOpen(true);
   };
@@ -878,13 +897,13 @@ export default function Schedule() {
   const closeTaskModal = () => {
     setIsTaskModalOpen(false);
     setSelectedTask(null);
-    setNewTask({ title: "", priority: "medium", dueDate: format(new Date(), "yyyy-MM-dd"), reminderType: "none", reminderTime: "09:00" });
+    setNewTask({ title: "", priority: "medium", dueDate: format(new Date(), "yyyy-MM-dd"), reminderType: "none", reminderTime: "09:00", isBacklog: false });
   };
 
   const handleAddTask = async () => {
     if (!newTask.title.trim()) return;
     
-    const taskData = {
+    const taskData: any = {
       title: newTask.title,
       priority: newTask.priority,
       completed: selectedTask ? selectedTask.completed : false,
@@ -893,8 +912,12 @@ export default function Schedule() {
       reminder_time: newTask.reminderTime
     };
 
+    if (dbSchema.hasTaskBacklog) {
+      taskData.is_backlog = newTask.isBacklog;
+    }
+
     if (selectedTask) {
-      setTasks(tasks.map(t => t.id === selectedTask.id ? { ...t, title: taskData.title, priority: taskData.priority, dueDate: taskData.due_date, reminderType: taskData.reminder_type, reminderTime: taskData.reminder_time } : t));
+      setTasks(tasks.map(t => t.id === selectedTask.id ? { ...t, title: taskData.title, priority: taskData.priority, dueDate: taskData.due_date, reminderType: taskData.reminder_type, reminderTime: taskData.reminder_time, isBacklog: newTask.isBacklog } : t));
       try {
         const supabase = getSupabase();
         if (!selectedTask.id.startsWith('t')) {
@@ -917,7 +940,8 @@ export default function Schedule() {
           completed: data.completed,
           dueDate: data.due_date,
           reminderType: data.reminder_type,
-          reminderTime: data.reminder_time
+          reminderTime: data.reminder_time,
+          isBacklog: data.is_backlog || newTask.isBacklog
         }]);
       } catch (error) {
         console.error("Error adding task:", error);
@@ -929,7 +953,8 @@ export default function Schedule() {
           completed: false,
           dueDate: taskData.due_date,
           reminderType: taskData.reminder_type,
-          reminderTime: taskData.reminder_time
+          reminderTime: taskData.reminder_time,
+          isBacklog: newTask.isBacklog
         }]);
       }
     }
@@ -1363,10 +1388,13 @@ export default function Schedule() {
             <h3 className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider px-1">Smart Tasks</h3>
             <div className="space-y-2">
               {sortedTasks.filter(t => !t.completed).slice(0, 3).map(task => (
-                <div key={task.id} className="p-3 bg-card/40 border border-border rounded-xl hover:border-accent-primary/30 transition-all cursor-pointer group">
+                <div key={task.id} className={`p-3 bg-card/40 border border-border rounded-xl transition-all cursor-pointer group ${task.isBacklog ? 'border-rose-100 hover:border-rose-300' : 'hover:border-accent-primary/30'}`}>
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <div className="text-[11px] font-bold text-foreground truncate group-hover:text-accent-primary transition-colors">{task.title}</div>
+                      <div className="text-[11px] font-bold text-foreground truncate group-hover:text-accent-primary transition-colors flex items-center gap-1.5">
+                        {task.isBacklog && <div className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" title="Arrear/Backlog" />}
+                        {task.title}
+                      </div>
                       <div className="text-[9px] font-black text-muted-foreground uppercase tracking-widest mt-1">Due {format(new Date(task.dueDate), 'MMM d')}</div>
                     </div>
                     <div className={`w-1.5 h-1.5 rounded-full mt-1 ${
@@ -1840,7 +1868,10 @@ export default function Schedule() {
                       {task.completed && <CheckCircle2 className="w-3 h-3" />}
                     </button>
                     <div className="min-w-0 flex-1">
-                      <div className={`text-[11px] font-bold truncate ${task.completed ? "text-slate-400 line-through" : "text-slate-700"}`}>
+                      <div className={`text-[11px] font-bold truncate flex items-center gap-1.5 ${task.completed ? "text-slate-400 line-through" : "text-slate-700"}`}>
+                        {task.isBacklog && (
+                          <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" title="Arrear / Backlog Task" />
+                        )}
                         {task.title}
                       </div>
                       <div className="flex items-center gap-2 mt-1">
@@ -1975,6 +2006,22 @@ export default function Schedule() {
                       <span>12h</span>
                     </div>
                   </div>
+                </div>
+
+                <div className="space-y-4">
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Arrears/Backlogs Clearance</label>
+                  <label className="flex items-center gap-3 p-4 rounded-2xl border border-slate-200 hover:border-indigo-500 hover:bg-slate-50 cursor-pointer transition-all">
+                    <input 
+                      type="checkbox" 
+                      checked={aiConfig.prioritizeBacklogs}
+                      onChange={(e) => setAiConfig({...aiConfig, prioritizeBacklogs: e.target.checked})}
+                      className="w-5 h-5 rounded border-slate-300 text-rose-500 focus:ring-rose-500"
+                    />
+                    <div>
+                      <span className="text-sm font-bold block text-slate-900">Prioritize Backlog Modules</span>
+                      <span className="text-[10px] font-medium text-slate-500 block mt-0.5">Focus schedule heavily on clearing failed/arrear courses</span>
+                    </div>
+                  </label>
                 </div>
 
                 <div className="space-y-4">
@@ -2328,6 +2375,22 @@ export default function Schedule() {
                     />
                   )}
                 </div>
+                
+                <div className="space-y-2 mt-4 pt-4 border-t border-slate-100">
+                  <label className="flex items-center gap-3 p-4 rounded-2xl border border-slate-200 hover:border-rose-200 hover:bg-rose-50/50 cursor-pointer transition-all">
+                    <input 
+                      type="checkbox" 
+                      checked={newTask.isBacklog}
+                      onChange={(e) => setNewTask({...newTask, isBacklog: e.target.checked})}
+                      className="w-5 h-5 rounded border-slate-300 text-rose-500 focus:ring-rose-500"
+                    />
+                    <div>
+                      <span className="text-sm font-bold block text-slate-900">Mark as Arrear / Backlog</span>
+                      <span className="text-[10px] font-medium text-slate-500 block mt-0.5">This task is for clearing a failed or backlog course</span>
+                    </div>
+                  </label>
+                </div>
+
                 <div className="flex gap-4 pt-6">
                   <button onClick={closeTaskModal} className="flex-1 py-4 text-slate-500 font-bold hover:bg-slate-50 rounded-2xl transition-all">Cancel</button>
                   <button 

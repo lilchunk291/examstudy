@@ -46,7 +46,8 @@ export default function Study() {
     intensity: "Balanced",
     learningStyle: "Visual",
     examType: "Final Exam",
-    topics: ""
+    topics: "",
+    prioritizeBacklogs: false
   });
   const [isMissionControlOpen, setIsMissionControlOpen] = useState(true);
   const [scale, setScale] = useState(1);
@@ -187,6 +188,7 @@ export default function Study() {
         - Learning Style: ${aiInputs.learningStyle}
         - Exam Type: ${aiInputs.examType}
         - Topics: ${aiInputs.topics || "General subjects"}
+        - High Priority Arrears/Backlogs: ${aiInputs.prioritizeBacklogs ? "YES! The student is failing or has backlogs. Prioritize catching up immediately, design a recovery-focused strategy!" : "No, standard study."}
 
         Suggest a sequence of 4-6 study sessions including:
         - Deep Work (focused study)
@@ -346,18 +348,14 @@ export default function Study() {
       const { data, error } = await supabase.from('study_nodes').select('*').order('created_at', { ascending: true });
       
       if (error) {
-        console.warn("Supabase fetch failed, using local fallback:", error);
-        const localNodes = [
-          { id: '1', title: "Calculus III", description: "Multi-variable differentiation and integration strategies for engineering applications.", type: "Core Module v1.0", status: "Active Session", color: "indigo", x: -250, y: 0 },
-          { id: '2', title: "Exam Mastery", description: "Final comprehensive review with 95% proficiency target for upcoming finals.", type: "Target Objective", status: "95%", color: "amber", x: 250, y: 0 }
-        ];
-        setNodes(localNodes);
-        if (isManual) toast.success("Loaded local fallback nodes");
+        console.warn("Supabase fetch failed:", error);
+        setNodes([]);
+        if (isManual) toast.error("Failed to load nodes");
         return;
       }
       
       console.log("Fetched nodes:", data?.length);
-      if (data && data.length > 0) {
+      if (data) {
         setNodes(data);
         if (isManual) toast.success("Canvas Refreshed");
       }
@@ -559,11 +557,26 @@ export default function Study() {
                     <BookOpen className="w-3 h-3" /> Topics
                   </label>
                   <textarea
-                    placeholder="What are you studying today?"
+                    placeholder="e.g., Data Structures, Economics 101"
                     value={aiInputs.topics}
                     onChange={(e) => setAiInputs({...aiInputs, topics: e.target.value})}
                     className="w-full p-4 rounded-2xl border border-slate-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all text-sm bg-slate-50 min-h-[100px] resize-none font-medium"
                   />
+                </div>
+                
+                <div className="space-y-4">
+                  <label className="flex items-center gap-3 p-4 rounded-2xl border border-slate-200 hover:border-rose-200 hover:bg-rose-50/50 cursor-pointer transition-all">
+                    <input 
+                      type="checkbox" 
+                      checked={aiInputs.prioritizeBacklogs}
+                      onChange={(e) => setAiInputs({...aiInputs, prioritizeBacklogs: e.target.checked})}
+                      className="w-5 h-5 rounded border-slate-300 text-rose-500 focus:ring-rose-500"
+                    />
+                    <div>
+                      <span className="text-sm font-bold block text-slate-900">Arrears / Backlog Support</span>
+                      <span className="text-[10px] font-medium text-slate-500 block mt-0.5">Prioritize strategy for catching up on failed courses</span>
+                    </div>
+                  </label>
                 </div>
 
                 <button
@@ -1012,9 +1025,9 @@ export default function Study() {
         <div className="flex-1 overflow-y-auto space-y-6 pr-2 custom-scrollbar pointer-events-auto">
               {[
                 { icon: Layers, title: "Flashcard Gen", desc: "Transforms lecture notes into active recall flashcard sets automatically.", color: "indigo" },
-                { icon: Clock, title: "Schedule Opt", desc: "AI-driven time blocking based on syllabus urgency and personal energy.", color: "emerald" },
                 { icon: Brain, title: "Cognitive AI", desc: "Identifies knowledge gaps and complex conceptual clusters.", color: "amber" },
-                { icon: FileText, title: "Source Scraper", desc: "Extracts key theorems and formulas from PDF or video inputs.", color: "rose" }
+                { icon: FileText, title: "Source Scraper", desc: "Extracts key theorems and formulas from PDF or video inputs.", color: "rose" },
+                { icon: AlertCircle, title: "Arrear Recovery", desc: "Specialized crash-course plan designed solely for passing a previously failed module.", color: "rose" }
               ].map((tool, i) => (
                 <motion.div 
                   key={i}
