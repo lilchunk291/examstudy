@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import FloatingAI from "./FloatingAI";
 import { getSupabase } from "../../lib/supabase";
+import { useAuth } from "../../lib/AuthContext";
 
 const navItems = [
   { to: "/app", icon: LayoutDashboard, label: "Dashboard" },
@@ -40,6 +41,7 @@ const navItems = [
 export default function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user, signOut, isLoading: authLoading } = useAuth();
   const [userName, setUserName] = useState<string>("Username");
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
   const [userStats, setUserStats] = useState({ level: 1, xp: 0 });
@@ -48,17 +50,24 @@ export default function Layout() {
   const { theme, setTheme } = useTheme();
 
   useEffect(() => {
-    async function fetchData() {
+    if (!authLoading && !user) {
+      navigate("/login");
+    }
+  }, [user, authLoading, navigate]);
+
+  useEffect(() => {
+    if (user) {
+      const name = user.user_metadata?.full_name || user.user_metadata?.name || (user.email ? user.email.split('@')[0] : "Username");
+      setUserName(name);
+      setUserAvatar(user.user_metadata?.avatar_url || user.user_metadata?.picture || null);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    async function fetchStats() {
+      if (!user) return;
       const supabase = getSupabase();
       
-      // Fetch User
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const name = user.user_metadata?.full_name || user.user_metadata?.name || (user.email ? user.email.split('@')[0] : "Username");
-        setUserName(name);
-        setUserAvatar(user.user_metadata?.avatar_url || user.user_metadata?.picture || null);
-      }
-
       // Fetch Stats
       const { count } = await supabase
         .from('tasks')
@@ -72,26 +81,28 @@ export default function Layout() {
       
       setUserStats({ level, xp: currentLevelXp });
     }
-    fetchData();
+    
+    if (user) {
+      fetchStats();
+    }
 
     // Subscribe to task changes to update XP in real-time
     const supabase = getSupabase();
     const channel = supabase
       .channel('header-stats')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => {
-        fetchData();
+        fetchStats();
       })
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [user]);
 
   const handleLogout = async (e: any) => {
     e.stopPropagation();
-    const supabase = getSupabase();
-    await supabase.auth.signOut();
+    await signOut();
     navigate("/login");
   };
 

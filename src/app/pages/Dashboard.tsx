@@ -18,10 +18,12 @@ import { useNavigate } from "react-router";
 import { motion } from "framer-motion";
 import { format } from "date-fns";
 import { getSupabase } from "../../lib/supabase";
+import { useAuth } from "../../lib/AuthContext";
 
 export default function Dashboard() {
   const navigate = useNavigate();
-
+  const { user } = useAuth();
+  
   const containerVariants = {
     initial: { opacity: 0 },
     animate: {
@@ -71,18 +73,16 @@ export default function Dashboard() {
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
 
   useEffect(() => {
-    async function fetchUser() {
-      const supabase = getSupabase();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const name = user.user_metadata?.full_name || user.user_metadata?.name || (user.email ? user.email.split('@')[0] : "Username");
-        setUserName(name);
-        setUserAvatar(user.user_metadata?.avatar_url || user.user_metadata?.picture || null);
-      }
+    if (user) {
+      const name = user.user_metadata?.full_name || user.user_metadata?.name || (user.email ? user.email.split('@')[0] : "Username");
+      setUserName(name);
+      setUserAvatar(user.user_metadata?.avatar_url || user.user_metadata?.picture || null);
     }
-    fetchUser();
+  }, [user]);
 
+  useEffect(() => {
     async function fetchTasksAndEvents() {
+      if (!user) return;
       try {
         const supabase = getSupabase();
         const [tasksResponse, eventsResponse] = await Promise.all([
@@ -190,7 +190,7 @@ export default function Dashboard() {
       supabase.removeChannel(tasksSubscription);
       supabase.removeChannel(eventsSubscription);
     };
-  }, []);
+  }, [user]);
 
   const toggleTaskCompletion = async (taskId: string, currentStatus: boolean) => {
     setTasks(tasks.map(t => t.id === taskId ? { ...t, completed: !currentStatus } : t));

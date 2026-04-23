@@ -28,18 +28,38 @@ export function getSupabase(): SupabaseClient {
     let finalUrl = '';
     let finalKey = '';
 
-    if (isValidUrl(supabaseUrl) && supabaseAnonKey) {
+    if (isValidUrl(supabaseUrl) && supabaseAnonKey && supabaseAnonKey !== 'YOUR_SUPABASE_ANON_KEY' && !supabaseUrl.includes('YOUR_SUPABASE_URL')) {
       finalUrl = supabaseUrl;
       finalKey = supabaseAnonKey;
     } else {
-      // Always fallback to the remote project if env vars are missing/invalid
+      // Detailed logging for debugging
+      const reasons = [];
+      if (!rawUrl) reasons.push("VITE_SUPABASE_URL is missing");
+      else if (!isValidUrl(supabaseUrl)) reasons.push("VITE_SUPABASE_URL is not a valid URL");
+      else if (supabaseUrl.includes('YOUR_SUPABASE_URL')) reasons.push("VITE_SUPABASE_URL is still set to placeholder");
+      
+      if (!rawKey) reasons.push("VITE_SUPABASE_ANON_KEY is missing");
+      else if (rawKey === 'YOUR_SUPABASE_ANON_KEY') reasons.push("VITE_SUPABASE_ANON_KEY is still set to placeholder");
+
+      console.warn(`Supabase environment variables missing or invalid: ${reasons.join(', ')}. Using remote project fallback.`);
+      
       finalUrl = remoteFallbackUrl;
       finalKey = remoteFallbackKey;
-      console.warn("Supabase environment variables missing or invalid. Using remote project fallback.");
     }
 
     try {
-      supabaseInstance = createClient(finalUrl, finalKey);
+      supabaseInstance = createClient(finalUrl, finalKey, {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: true,
+          storageKey: 'studyvault-auth-token',
+          flowType: 'pkce',
+          storage: window.localStorage,
+          // Explicitly handle locking issues in iframe/dev environments
+          // navigator.locks can be unreliable in nested iframes
+        }
+      });
     } catch (err: any) {
       console.error("Failed to initialize Supabase client:", err.message);
       throw new Error(`Supabase Initialization Error: ${err.message}. URL was: "${finalUrl}"`);

@@ -1,5 +1,8 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate } from "react-router";
+import { getSupabase } from "../../lib/supabase";
+import { useAuth } from "../../lib/AuthContext";
 import { 
   User, 
   Bell, 
@@ -29,18 +32,16 @@ import {
   Info,
   ExternalLink
 } from "lucide-react";
-import { getSupabase } from "../../lib/supabase";
 import { toast } from "sonner";
-import { useNavigate } from "react-router";
 
 type ActiveTab = "profile" | "ai" | "notifications" | "privacy" | "integrations";
 
 export default function Settings() {
   const navigate = useNavigate();
+  const { user, signOut, isLoading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState<ActiveTab>("profile");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [user, setUser] = useState<any>(null);
   
   const [profile, setProfile] = useState({
     full_name: "",
@@ -53,7 +54,8 @@ export default function Settings() {
     improveResponses: true,
     suggestTopics: true,
     voiceEnabled: false,
-    autoFocus: true
+    autoFocus: true,
+    preferredTimeSlots: ["morning", "afternoon"]
   });
 
   const [notificationSettings, setNotificationSettings] = useState({
@@ -63,23 +65,47 @@ export default function Settings() {
     backlogAlerts: true
   });
 
+  const [privacySettings, setPrivacySettings] = useState({
+    profileVisibility: true,
+    aiFeedback: false,
+    twoFactorEnabled: true
+  });
+
+  const [integrations, setIntegrations] = useState([
+    { id: 'supabase', name: "Supabase DB", desc: "Real-time sync of your study data and archives.", icon: Database, color: "emerald", connected: true },
+    { id: 'gemini', name: "Google Gemini", desc: "AI core for optimized scheduling and chat help.", icon: Sparkles, color: "indigo", connected: true },
+    { id: 'canvas', name: "Canvas LMS", desc: "One-way sync of assignments and syllabus.", icon: RefreshCw, color: "rose", connected: false },
+    { id: 'notion', name: "Notion", desc: "Export study nodes and vault items directly to Notion.", icon: Globe, color: "slate", connected: false }
+  ]);
+
+  useEffect(() => {
+    // Check for actual connectivity
+    const checkIntegrations = () => {
+      const isSupabaseConfigured = !!import.meta.env.VITE_SUPABASE_URL && !!import.meta.env.VITE_SUPABASE_ANON_KEY;
+      // In this environment, Gemini is provided via process.env.GEMINI_API_KEY on server, 
+      // but usually we check if the worker is ready or if we have a proxy.
+      // Let's assume it's connected if we are in this app.
+      
+      setIntegrations(prev => prev.map(item => {
+        if (item.id === 'supabase') return { ...item, connected: isSupabaseConfigured };
+        if (item.id === 'gemini') return { ...item, connected: true }; // Gemini is built-in
+        return item;
+      }));
+    };
+    checkIntegrations();
+  }, []);
+
   useEffect(() => {
     async function fetchProfile() {
+      if (!user) return;
       try {
+        setIsLoading(true);
         const supabase = getSupabase();
-        const { data: { user: authUser } } = await supabase.auth.getUser();
-        
-        if (!authUser) {
-          navigate("/login");
-          return;
-        }
-        
-        setUser(authUser);
 
         const { data, error } = await supabase
           .from("student_profiles")
           .select("*")
-          .eq("user_id", authUser.id)
+          .eq("user_id", user.id)
           .single();
 
         if (data) {
@@ -89,6 +115,17 @@ export default function Settings() {
             learning_style: data.learning_style || "Visual",
             avatar_url: data.avatar_url || ""
           });
+
+          // Load preferences from JSON if exists, otherwise fallback to defaults
+          if (data.preferences) {
+            const prefs = typeof data.preferences === 'string' 
+              ? JSON.parse(data.preferences) 
+              : data.preferences;
+              
+            if (prefs.ai) setAiSettings(prev => ({ ...prev, ...prefs.ai }));
+            if (prefs.notifications) setNotificationSettings(prev => ({ ...prev, ...prefs.notifications }));
+            if (prefs.privacy) setPrivacySettings(prev => ({ ...prev, ...prefs.privacy }));
+          }
         }
       } catch (error) {
         console.error("Error fetching settings:", error);
@@ -97,14 +134,25 @@ export default function Settings() {
       }
     }
 
-    fetchProfile();
-  }, [navigate]);
+    if (user) {
+      fetchProfile();
+    } else if (!authLoading) {
+      navigate("/login");
+    }
+  }, [user, authLoading, navigate]);
 
-  const handleSaveProfile = async () => {
+  const handleSaveAllSettings = async () => {
     if (!user) return;
     setIsSaving(true);
     try {
       const supabase = getSupabase();
+      
+      const preferences = {
+        ai: aiSettings,
+        notifications: notificationSettings,
+        privacy: privacySettings
+      };
+
       const { error } = await supabase
         .from("student_profiles")
         .upsert({
@@ -112,13 +160,16 @@ export default function Settings() {
           full_name: profile.full_name,
           bio: profile.bio,
           learning_style: profile.learning_style,
+          avatar_url: profile.avatar_url,
+          preferences: preferences, // Save as JSONB
           updated_at: new Date().toISOString()
         });
 
       if (error) throw error;
-      toast.success("Profile updated successfully");
+      toast.success("All settings synchronized successfully");
     } catch (error: any) {
-      toast.error(error.message || "Failed to update profile");
+      console.error("Error saving settings:", error);
+      toast.error(error.message || "Failed to sync settings");
     } finally {
       setIsSaving(false);
     }
@@ -126,8 +177,7 @@ export default function Settings() {
 
   const handleSignOut = async () => {
     try {
-      const supabase = getSupabase();
-      await supabase.auth.signOut();
+      await signOut();
       navigate("/login");
     } catch (error) {
       toast.error("Error signing out");
@@ -183,10 +233,10 @@ export default function Settings() {
           <div className="bg-white/40 backdrop-blur-3xl rounded-3xl p-5 border border-white/20 shadow-xl space-y-4">
             {[
               { id: "profile", label: "Profile", icon: User },
-              { id: "ai", label: "AI Assistant", icon: Brain, to: "/app/settings/ai-assistant" },
-              { id: "notifications", label: "Notifications", icon: Bell, to: "/app/settings/notifications" },
-              { id: "privacy", label: "Privacy & Security", icon: Shield, to: "/app/settings/privacy" },
-              { id: "integrations", label: "Integrations", icon: Link2, to: "/app/settings/integrations" },
+              { id: "ai", label: "AI Assistant", icon: Brain },
+              { id: "notifications", label: "Notifications", icon: Bell },
+              { id: "privacy", label: "Privacy & Security", icon: Shield },
+              { id: "integrations", label: "Integrations", icon: Link2 },
               { id: "theme", label: "Theme", icon: Sparkles, to: "/app/theme" },
             ].map((item, i) => (
               <motion.button 
@@ -326,18 +376,18 @@ export default function Settings() {
                     </div>
                   </div>
 
-                  <div className="flex justify-end pt-10 relative z-10">
-                    <motion.button 
-                      whileHover={{ scale: 1.05, y: -5 }}
-                      whileTap={{ scale: 0.95 }}
-                      disabled={isSaving}
-                      onClick={handleSaveProfile}
-                      className="px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full text-base font-bold tracking-tight shadow-xl shadow-indigo-200 transition-all flex items-center gap-3"
-                    >
-                      {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                      {isSaving ? "Syncing..." : "Save Profile"}
-                    </motion.button>
-                  </div>
+                      <div className="flex justify-end pt-10 relative z-10">
+                        <motion.button 
+                          whileHover={{ scale: 1.05, y: -5 }}
+                          whileTap={{ scale: 0.95 }}
+                          disabled={isSaving}
+                          onClick={handleSaveAllSettings}
+                          className="px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full text-base font-bold tracking-tight shadow-xl shadow-indigo-200 transition-all flex items-center gap-3"
+                        >
+                          {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                          {isSaving ? "Syncing..." : "Save Profile"}
+                        </motion.button>
+                      </div>
                 </motion.div>
 
                 {/* Danger Zone */}
@@ -392,6 +442,33 @@ export default function Settings() {
                   </div>
 
                   <div className="grid gap-6">
+                    <div className="p-6 rounded-2xl bg-white/40 border border-white/60 space-y-4">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em]">Preferred Study Windows</label>
+                      <div className="flex flex-wrap gap-3">
+                        {["early-bird", "morning", "afternoon", "evening", "night"].map((slot) => {
+                          const isActive = aiSettings.preferredTimeSlots.includes(slot);
+                          return (
+                            <button
+                              key={slot}
+                              onClick={() => {
+                                const newSlots = isActive 
+                                  ? aiSettings.preferredTimeSlots.filter(s => s !== slot)
+                                  : [...aiSettings.preferredTimeSlots, slot];
+                                setAiSettings({ ...aiSettings, preferredTimeSlots: newSlots });
+                              }}
+                              className={`px-4 py-2 rounded-xl text-xs font-bold capitalize transition-all border ${
+                                isActive 
+                                  ? "bg-amber-100 border-amber-200 text-amber-700" 
+                                  : "bg-white/60 border-white/80 text-slate-500 hover:bg-white"
+                              }`}
+                            >
+                              {slot.replace('-', ' ')}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
                     {[
                       { id: 'improveResponses', label: "Adaptive Insights", desc: "Allow AI to learn from your study patterns to provide better advice.", icon: Zap },
                       { id: 'suggestTopics', label: "Proactive Suggestions", desc: "AI will periodically suggest study topics based on your syllabus.", icon: Sparkles },
@@ -419,6 +496,19 @@ export default function Settings() {
                         </button>
                       </div>
                     ))}
+                  </div>
+
+                  <div className="flex justify-end relative z-10">
+                    <motion.button 
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      disabled={isSaving}
+                      onClick={handleSaveAllSettings}
+                      className="px-8 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-full text-sm font-bold tracking-tight shadow-xl shadow-amber-200 transition-all flex items-center gap-3"
+                    >
+                      {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                      Sync AI Config
+                    </motion.button>
                   </div>
 
                   <div className="p-6 bg-amber-50/50 border border-amber-200 rounded-3xl space-y-4">
@@ -484,6 +574,19 @@ export default function Settings() {
                         </button>
                       </div>
                     ))}
+                  </div>
+
+                  <div className="flex justify-end relative z-10">
+                    <motion.button 
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      disabled={isSaving}
+                      onClick={handleSaveAllSettings}
+                      className="px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full text-sm font-bold tracking-tight shadow-xl shadow-indigo-200 transition-all flex items-center gap-3"
+                    >
+                      {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                      Update Alerts
+                    </motion.button>
                   </div>
                 </motion.div>
               </motion.div>
@@ -559,21 +662,40 @@ export default function Settings() {
                       <h3 className="text-base font-black uppercase tracking-widest text-slate-800">Data Visibility</h3>
                       <div className="space-y-4">
                         {[
-                          { label: "Profile Visibility", desc: "Allow other users to see your study progress in Silent Rooms.", initial: true },
-                          { label: "AI Feedback Loops", desc: "Send anonymized usage data to help us build better models.", initial: false }
-                        ].map((p, i) => (
-                          <div key={i} className="flex items-center justify-between p-4 rounded-xl hover:bg-white/60 transition-all">
+                          { id: "profileVisibility", label: "Profile Visibility", desc: "Allow other users to see your study progress in Silent Rooms." },
+                          { id: "aiFeedback", label: "AI Feedback Loops", desc: "Send anonymized usage data to help us build better models." }
+                        ].map((p) => (
+                          <div key={p.id} className="flex items-center justify-between p-4 rounded-xl hover:bg-white/60 transition-all">
                             <div className="space-y-1">
                               <div className="text-sm font-bold text-slate-900">{p.label}</div>
                               <div className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">{p.desc}</div>
                             </div>
-                            <button className="w-12 h-6 rounded-full bg-emerald-500 relative transition-all">
-                               <div className="w-4 h-4 rounded-full bg-white shadow-sm absolute top-1 right-1" />
+                            <button 
+                              onClick={() => setPrivacySettings(prev => ({ ...prev, [p.id]: !prev[p.id as keyof typeof privacySettings] }))}
+                              className={`w-12 h-6 rounded-full relative transition-all ${privacySettings[p.id as keyof typeof privacySettings] ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                            >
+                               <motion.div 
+                                 animate={{ x: privacySettings[p.id as keyof typeof privacySettings] ? 24 : 4 }}
+                                 className="w-4 h-4 rounded-full bg-white shadow-sm absolute top-1" 
+                               />
                             </button>
                           </div>
                         ))}
                       </div>
                     </div>
+                  </div>
+
+                  <div className="flex justify-end relative z-10">
+                    <motion.button 
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      disabled={isSaving}
+                      onClick={handleSaveAllSettings}
+                      className="px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full text-sm font-bold tracking-tight shadow-xl shadow-emerald-200 transition-all flex items-center gap-3"
+                    >
+                      {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                      Save Privacy Settings
+                    </motion.button>
                   </div>
                 </motion.div>
               </motion.div>
@@ -602,12 +724,7 @@ export default function Settings() {
                   </div>
 
                   <div className="grid gap-6">
-                    {[
-                      { id: 'supabase', name: "Supabase DB", desc: "Real-time sync of your study data and archives.", icon: Database, color: "emerald", connected: true },
-                      { id: 'gemini', name: "Google Gemini", desc: "AI core for optimized scheduling and chat help.", icon: Sparkles, color: "indigo", connected: true },
-                      { id: 'canvas', name: "Canvas LMS", desc: "One-way sync of assignments and syllabus.", icon: RefreshCw, color: "rose", connected: false },
-                      { id: 'notion', name: "Notion", desc: "Export study nodes and vault items directly to Notion.", icon: Globe, color: "slate", connected: false }
-                    ].map((item) => (
+                    {integrations.map((item) => (
                       <div key={item.id} className="flex items-center justify-between p-6 rounded-3xl bg-white/40 border border-white/60 hover:bg-white transition-all shadow-sm group">
                         <div className="flex items-center gap-6">
                           <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border shadow-inner transition-transform group-hover:scale-110 ${

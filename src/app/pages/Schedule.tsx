@@ -28,6 +28,7 @@ import {
 import { useNavigate } from "react-router";
 import { format, addDays, startOfWeek, eachDayOfInterval, isSameDay, addHours, startOfDay, isBefore, isAfter, subHours, subDays, parseISO, startOfMonth, endOfMonth, endOfWeek } from "date-fns";
 import { getSupabase } from "../../lib/supabase";
+import { useAuth } from "../../lib/AuthContext";
 import FocusMode from "../components/FocusMode";
 import { toast } from "sonner";
 import { generateSchedule } from "../../services/scheduleGenerator";
@@ -60,6 +61,7 @@ export type Task = {
 };
 
 export default function Schedule() {
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<"day" | "week" | "month">("week");
@@ -255,13 +257,29 @@ export default function Schedule() {
       try {
         const supabase = getSupabase();
         
-        const [tasksResponse, eventsResponse] = await Promise.all([
+        const [tasksResponse, eventsResponse, profileResponse] = await Promise.all([
           supabase.from('tasks').select('*').order('created_at', { ascending: false }),
-          supabase.from('events').select('*').order('start_time', { ascending: true })
+          supabase.from('events').select('*').order('start_time', { ascending: true }),
+          user ? supabase.from('student_profiles').select('*').eq('user_id', user.id).single() : Promise.resolve({ data: null, error: null })
         ]);
 
         if (tasksResponse.error) throw tasksResponse.error;
         if (eventsResponse.error) throw eventsResponse.error;
+
+        // Sync AI Config from profile preferences if available
+        if (profileResponse.data && profileResponse.data.preferences) {
+          const prefs = typeof profileResponse.data.preferences === 'string' 
+            ? JSON.parse(profileResponse.data.preferences) 
+            : profileResponse.data.preferences;
+          
+          if (prefs.ai) {
+            setAiConfig(prev => ({
+              ...prev,
+              learningStyle: profileResponse.data.learning_style || prev.learningStyle,
+              preferredTimeSlots: prefs.ai.preferredTimeSlots || prev.preferredTimeSlots
+            }));
+          }
+        }
 
         let hasTaskBacklog = false;
         if (tasksResponse.data && tasksResponse.data.length > 0) {
@@ -394,7 +412,7 @@ export default function Schedule() {
       supabase.removeChannel(tasksSubscription);
       supabase.removeChannel(eventsSubscription);
     };
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     const checkReminders = () => {

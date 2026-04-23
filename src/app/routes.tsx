@@ -10,10 +10,6 @@ import Crisis from "./pages/Crisis";
 import Profile from "./pages/Profile";
 import Vault from "./pages/Vault";
 import Settings from "./pages/Settings";
-import AiAssistantSettings from "./pages/AiAssistantSettings";
-import NotificationSettings from "./pages/NotificationSettings";
-import PrivacySettings from "./pages/PrivacySettings";
-import IntegrationsSettings from "./pages/IntegrationsSettings";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -58,14 +54,6 @@ export const router = createBrowserRouter([
       { path: "profile", Component: Profile },
       { path: "vault", Component: Vault },
       { path: "settings", Component: Settings },
-      { path: "settings/ai-assistant", Component: AiAssistantSettings },
-      { path: "settings/ai", Component: AiAssistantSettings },
-      { path: "settings/notifications", Component: NotificationSettings },
-      { path: "settings/notification", Component: NotificationSettings },
-      { path: "settings/privacy", Component: PrivacySettings },
-      { path: "settings/privacy-security", Component: PrivacySettings },
-      { path: "settings/integrations", Component: IntegrationsSettings },
-      { path: "settings/integration", Component: IntegrationsSettings },
       { path: "theme", Component: ThemeEditor },
       { path: "focus", Component: DeepSession },
       { path: "*", Component: NotFound },
