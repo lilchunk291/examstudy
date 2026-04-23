@@ -5,6 +5,7 @@ export interface AIConfig {
   targetHours: number;
   topics: string;
   prioritizeBacklogs?: boolean;
+  preferredTimeSlots?: string[]; // e.g. ["morning", "afternoon", "evening", "night"]
 }
 
 export interface GeneratedEvent {
@@ -32,6 +33,19 @@ export const generateSchedule = (
   const baseDuration = durationMap[aiConfig.intensity as keyof typeof durationMap] || 60;
   const topicsList = aiConfig.topics ? aiConfig.topics.split(',').map(t => t.trim()) : ["General Study"];
   
+  // Time slot definitions
+  const slotHours: Record<string, { start: number, end: number }> = {
+    "morning": { start: 8, end: 12 },
+    "afternoon": { start: 13, end: 17 },
+    "evening": { start: 18, end: 22 },
+    "night": { start: 22, end: 2 }, // Crosses midnight
+    "early-bird": { start: 5, end: 9 }
+  };
+
+  const selectedSlots = aiConfig.preferredTimeSlots && aiConfig.preferredTimeSlots.length > 0 
+    ? aiConfig.preferredTimeSlots 
+    : ["morning", "afternoon"];
+
   // RL Agent State
   let currentFatigue = 0;
 
@@ -51,11 +65,23 @@ export const generateSchedule = (
   // Generate 7 days of schedule
   for (let i = 0; i < 7; i++) {
     let dailyHoursAllocated = 0;
-    let currentHour = 9; // Start at 9 AM
     currentFatigue = 0; // Reset fatigue each day
 
-    while (dailyHoursAllocated < aiConfig.targetHours && currentHour < 20) {
-      // RL Policy: If fatigue is too high, take a break
+    // Iterate through selected time slots
+    for (const slotName of selectedSlots) {
+      if (dailyHoursAllocated >= aiConfig.targetHours) break;
+
+      const slot = slotHours[slotName];
+      if (!slot) continue;
+
+      let currentHour = slot.start;
+      const endHour = slot.end;
+
+      // Handle night shift crossing midnight
+      const effectiveEndHour = endHour < currentHour ? endHour + 24 : endHour;
+
+      while (dailyHoursAllocated < aiConfig.targetHours && currentHour < effectiveEndHour) {
+        // RL Policy: If fatigue is too high, take a break
       if (currentFatigue > 70) {
         const breakStart = new Date(startDate);
         breakStart.setDate(breakStart.getDate() + i);
@@ -115,6 +141,7 @@ export const generateSchedule = (
       currentFatigue += (baseDuration === 120 ? 45 : 25); // Deep work causes more fatigue
     }
   }
+}
 
-  return plan;
+return plan;
 };

@@ -43,8 +43,9 @@ body {
 
 /* Markdown Styles */
 .markdown-body {
-  font-size: inherit;
-  line-height: inherit;
+  font-size: 0.9375rem;
+  line-height: 1.625;
+  color: inherit;
 }
 
 .markdown-body p {
@@ -61,7 +62,7 @@ body {
 }
 
 .markdown-body li {
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.5rem;
 }
 
 .markdown-body ul {
@@ -72,46 +73,66 @@ body {
   list-style-type: decimal;
 }
 
-.markdown-body code {
+.markdown-body code:not(pre code) {
   font-family: var(--font-mono);
-  background-color: rgba(99, 102, 241, 0.1);
-  padding: 0.2rem 0.4rem;
-  border-radius: 0.25rem;
-  font-size: 0.9em;
+  background-color: rgba(99, 102, 241, 0.08);
+  color: #4f46e5;
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.375rem;
+  font-size: 0.875em;
+  font-weight: 600;
 }
 
 .markdown-body pre {
-  font-family: var(--font-mono);
-  background-color: rgba(15, 23, 42, 0.05);
-  padding: 1rem;
+  margin: 1.25rem 0;
   border-radius: 0.75rem;
-  overflow-x: auto;
-  margin-bottom: 1rem;
-  border: 1px solid rgba(15, 23, 42, 0.1);
-}
-
-.markdown-body pre code {
-  background-color: transparent;
-  padding: 0;
-  border-radius: 0;
-  color: inherit;
+  overflow: hidden;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
 .markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4 {
-  font-weight: 700;
-  margin-top: 1.5rem;
-  margin-bottom: 0.75rem;
-  line-height: 1.25;
+  font-weight: 800;
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+  color: #0f172a;
 }
 
-.markdown-body h1 { font-size: 1.5em; }
-.markdown-body h2 { font-size: 1.25em; }
-.markdown-body h3 { font-size: 1.1em; }
+.markdown-body h1 { font-size: 1.875rem; border-bottom: 1px solid rgba(0,0,0,0.05); padding-bottom: 0.5rem; }
+.markdown-body h2 { font-size: 1.5rem; }
+.markdown-body h3 { font-size: 1.25rem; }
 
 .markdown-body blockquote {
-  border-left: 4px solid rgba(99, 102, 241, 0.3);
-  padding-left: 1rem;
-  color: #64748b;
+  border-left: 4px solid #6366f1;
+  padding: 0.5rem 1rem;
+  background-color: rgba(99, 102, 241, 0.03);
+  color: #475569;
   font-style: italic;
-  margin-bottom: 1rem;
+  margin: 1.25rem 0;
+  border-radius: 0 0.5rem 0.5rem 0;
+}
+
+.markdown-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.25rem 0;
+  font-size: 0.875rem;
+}
+
+.markdown-body th, .markdown-body td {
+  border: 1px solid #e2e8f0;
+  padding: 0.75rem;
+  text-align: left;
+}
+
+.markdown-body th {
+  background-color: #f8fafc;
+  font-weight: 700;
+}
+
+.markdown-body hr {
+  margin: 2rem 0;
+  border: 0;
+  border-top: 1px solid #e2e8f0;
 }

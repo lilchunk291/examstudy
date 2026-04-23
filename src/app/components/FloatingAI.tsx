@@ -2,6 +2,10 @@ import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+// @ts-ignore
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+// @ts-ignore
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { 
   MessageSquare, 
   X, 
@@ -13,8 +17,10 @@ import {
   Maximize2,
   Brain,
   Plus,
-  Mic
+  Mic,
+  CheckCircle2
 } from "lucide-react";
+import { toast } from "sonner";
 
 import { GoogleGenAI } from "@google/genai";
 
@@ -48,7 +54,12 @@ export default function FloatingAI() {
     setIsLoading(true);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const rawApiKey = import.meta.env.VITE_GEMINI_API_KEY;
+      if (!rawApiKey) {
+        throw new Error("Gemini API key is not configured.");
+      }
+      const apiKey = rawApiKey.replace(/['"]/g, '').trim();
+      const ai = new GoogleGenAI({ apiKey });
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: [...messages, userMsg].map(m => ({
@@ -141,10 +152,45 @@ export default function FloatingAI() {
                       <div className={`max-w-[85%] p-4 rounded-[24px] text-sm font-bold tracking-tight border shadow-xl backdrop-blur-md ${
                         msg.type === "user" 
                           ? "bg-indigo-600 text-white rounded-tr-none border-indigo-500 shadow-indigo-100/50" 
-                          : "bg-white/80 border-white/40 text-slate-800 rounded-tl-none"
+                          : "bg-white/90 border-white/40 text-slate-800 rounded-tl-none"
                       }`}>
-                        <div className="markdown-body">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        <div className={`markdown-body ${msg.type === "user" ? "text-indigo-50" : "text-slate-700"}`}>
+                          <ReactMarkdown 
+                            remarkPlugins={[remarkGfm]}
+                            components={{
+                              code({ node, inline, className, children, ...props }: any) {
+                                const match = /language-(\w+)/.exec(className || '');
+                                return !inline && match ? (
+                                  <div className="my-2 rounded-lg overflow-hidden border border-slate-700/10 shadow-sm">
+                                    <div className="bg-slate-800 px-3 py-1.5 flex justify-between items-center">
+                                      <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{match[1]}</span>
+                                      <button 
+                                        onClick={() => {
+                                          navigator.clipboard.writeText(String(children).replace(/\n$/, ''));
+                                          toast.success("Code copied");
+                                        }}
+                                        className="text-slate-400 hover:text-white transition-colors"
+                                      >
+                                        <CheckCircle2 className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                    <SyntaxHighlighter
+                                      {...props}
+                                      children={String(children).replace(/\n$/, '')}
+                                      style={vscDarkPlus}
+                                      language={match[1]}
+                                      PreTag="div"
+                                      customStyle={{ margin: 0, padding: '1rem', fontSize: '0.75rem' }}
+                                    />
+                                  </div>
+                                ) : (
+                                  <code className={className} {...props}>
+                                    {children}
+                                  </code>
+                                );
+                              }
+                            }}
+                          >
                             {msg.content}
                           </ReactMarkdown>
                         </div>

@@ -94,8 +94,8 @@ export default function Profile() {
             <div className="space-y-2">
               <div className="flex items-center gap-6">
                 <h2 className="text-3xl font-bold tracking-tight text-slate-900">Student User</h2>
-                <span className="px-4 py-1 rounded-full bg-indigo-600 text-white text-[10px] font-bold uppercase tracking-widest shadow-lg shadow-indigo-200">
-                  Premium
+                <span className="px-4 py-1 rounded-full bg-emerald-600 text-white text-[10px] font-bold uppercase tracking-widest shadow-lg shadow-emerald-200">
+                  Verified
                 </span>
               </div>
               <p className="text-slate-500 font-semibold tracking-tight text-lg">student@university.edu</p>

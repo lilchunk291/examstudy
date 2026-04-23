@@ -2,6 +2,10 @@ import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+// @ts-ignore
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+// @ts-ignore
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import Whiteboard from "../components/Whiteboard";
 
 import { 
@@ -62,6 +66,7 @@ import { GoogleGenAI } from "@google/genai";
 import { API_CONFIG, getApiUrl } from "../../lib/config";
 import { getSupabase } from "../../lib/supabase";
 import { useAIWorker } from "../../lib/AIWorkerContext";
+import { toast } from "sonner";
 
 type Message = {
   id: number;
@@ -87,8 +92,11 @@ export default function Chat() {
 
   // Models Configuration
   const availableModels = [
-    { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash", type: "cloud", provider: "Google", icon: Cloud },
-    { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro", type: "cloud", provider: "Google", icon: Cloud },
+    { id: "gemini-3-flash-preview", name: "Gemini 3 Flash", type: "cloud", provider: "Google", icon: Cloud },
+    { id: "gemini-3.1-pro-preview", name: "Gemini 3.1 Pro", type: "cloud", provider: "Google", icon: Cloud },
+    { id: "gemini-3.1-flash-lite-preview", name: "Gemini 3.1 Flash Lite", type: "cloud", provider: "Google", icon: Cloud },
+    { id: "gpt-4o", name: "GPT-4o (Puter)", type: "puter", provider: "OpenAI", icon: Zap },
+    { id: "claude-3-5-sonnet", name: "Claude 3.5 Sonnet (Puter)", type: "puter", provider: "Anthropic", icon: Brain },
     { id: "onnx-community/gemma-4-E4B-it-ONNX", name: "Gemma 4 (4B)", type: "local", provider: "Google", icon: ShieldCheck },
     { id: "onnx-community/gemma-4-E2B-it-ONNX", name: "Gemma 4 (2B)", type: "local", provider: "Google", icon: ShieldCheck },
     { id: "onnx-community/Llama-3.2-1B-Instruct", name: "Llama 3.2 (1B)", type: "local", provider: "Meta", icon: ShieldCheck },
@@ -97,7 +105,7 @@ export default function Chat() {
   ];
 
   // AI Model State
-  const [selectedModelId, setSelectedModelId] = useState<string>("gemini-2.5-flash");
+  const [selectedModelId, setSelectedModelId] = useState<string>("gemini-3-flash-preview");
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isWhiteboardOpen, setIsWhiteboardOpen] = useState(false);
@@ -127,11 +135,54 @@ export default function Chat() {
   const scanInputRef = useRef<HTMLInputElement>(null);
   const [isConnectorsModalOpen, setIsConnectorsModalOpen] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
-  const [connectedServices, setConnectedServices] = useState<string[]>([]);
+  const [connectedServices, setConnectedServices] = useState<string[]>(['supabase', 'gemini']);
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [sessionFiles, setSessionFiles] = useState<File[]>([]);
+  const [vaultFiles, setVaultFiles] = useState<any[]>([]);
+
+  useEffect(() => {
+    async function fetchVaultFiles() {
+      const supabase = getSupabase();
+      const { data } = await supabase.from('vault_files').select('*');
+      if (data) setVaultFiles(data);
+    }
+    fetchVaultFiles();
+  }, []);
 
   const connectors = [
+    {
+      id: "vault",
+      name: "Knowledge Vault",
+      subtitle: "Integrated Protocol",
+      description: "Direct access to your stored documents, study guides, and research archives.",
+      icon: Library,
+      color: "text-indigo-500",
+      bg: "bg-indigo-500/10",
+      category: "Personal Data",
+      popular: true
+    },
+    {
+      id: "supabase",
+      name: "Supabase Database",
+      subtitle: "Active Connection",
+      description: "Real-time state synchronization and persistent secure storage.",
+      icon: ShieldCheck,
+      color: "text-emerald-500",
+      bg: "bg-emerald-500/10",
+      category: "Infrastructure",
+      popular: true
+    },
+    {
+      id: "gemini",
+      name: "Google Gemini AI",
+      subtitle: "Active Protocol",
+      description: "Neural reasoning and multimodal architectural analysis.",
+      icon: Cpu,
+      color: "text-indigo-500",
+      bg: "bg-indigo-500/10",
+      category: "AI",
+      popular: true
+    },
     {
       id: "google-drive",
       name: "Google Drive",
@@ -196,6 +247,17 @@ export default function Chat() {
       category: "Development"
     },
     {
+      id: "puter",
+      name: "Puter.js AI",
+      subtitle: "Free Protocol",
+      description: "Direct serverless access to GPT-4o and Claude 3.5 without API keys.",
+      icon: Zap,
+      color: "text-amber-500",
+      bg: "bg-amber-500/10",
+      category: "AI",
+      popular: true
+    },
+    {
       id: "obsidian",
       name: "Obsidian",
       subtitle: "Local First",
@@ -246,50 +308,27 @@ export default function Chat() {
   };
 
   const toggleConnection = (id: string) => {
+    if (id === 'supabase' || id === 'gemini') {
+      alert(`${id === 'supabase' ? 'Supabase' : 'Gemini'} is already connected via your environment configuration.`);
+      return;
+    }
     setConnectedServices(prev => 
       prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]
     );
   };
 
   useEffect(() => {
-    async function fetchMessages() {
-      try {
-        const supabase = getSupabase();
-        const { data, error } = await supabase.from('chat_messages').select('*').order('created_at', { ascending: true });
-        if (error) throw error;
-        
-        if (data && data.length > 0) {
-          setMessages(data.map(m => ({
-            id: m.id,
-            type: m.role as "user" | "ai",
-            content: m.content,
-            timestamp: new Date(m.created_at)
-          })));
-        } else {
-          const initialMessage = {
-            role: "ai",
-            content: "Protocol initialized. I'm your AI study architect. How shall we optimize your knowledge graph today?"
-          };
-          const { data: inserted } = await supabase.from('chat_messages').insert([initialMessage]).select();
-          if (inserted) {
-            setMessages(inserted.map(m => ({
-              id: m.id,
-              type: m.role as "user" | "ai",
-              content: m.content,
-              timestamp: new Date(m.created_at)
-            })));
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching messages:", error);
-      }
-    }
-    fetchMessages();
-
     const supabase = getSupabase();
+    
+    // Realtime subscription for messages in the active conversation
     const messagesSub = supabase
       .channel('public:chat_messages')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_messages' }, payload => {
+        // Get active chat from state via ref
+        const activeConversation = conversationsRef.current.find(c => c.active);
+        
+        if (!activeConversation || !payload.new || (payload.new as any).conversation_id !== activeConversation.id) return;
+
         if (payload.eventType === 'INSERT') {
           setMessages(current => {
             if (current.find(m => m.id === payload.new.id)) return current;
@@ -316,7 +355,7 @@ export default function Chat() {
     return () => {
       supabase.removeChannel(messagesSub);
     };
-  }, []);
+  }, []); // Run on mount only
 
   const handleModelSelect = (modelId: string) => {
     setSelectedModelId(modelId);
@@ -359,25 +398,75 @@ export default function Chat() {
     handleModelSelect(modelId);
   };
 
-  const [conversations, setConversations] = useState<{ id: number; title: string; time: string; active: boolean; }[]>([]);
+  const [conversations, setConversations] = useState<any[]>([]);
+  const conversationsRef = useRef(conversations);
 
-  const createNewChat = () => {
-    const newConv = {
-      id: Date.now(),
-      title: "New Conversation",
-      time: "Just now",
-      active: true
-    };
-    setConversations(prev => [newConv, ...prev.map(c => ({ ...c, active: false }))]);
+  useEffect(() => {
+    conversationsRef.current = conversations;
+  }, [conversations]);
+
+  useEffect(() => {
+    async function init() {
+      const supabase = getSupabase();
+      
+      // Load conversations
+      const { data: convs, error: convError } = await supabase.from('conversations').select('*').order('created_at', { ascending: false });
+      if (convError) {
+        console.error("Error loading conversations", convError);
+        return;
+      }
+
+      if (convs && convs.length > 0) {
+        setConversations(convs.map(c => ({ ...c, active: false })));
+        switchConversation(convs[0].id);
+      } else {
+        createNewChat();
+      }
+    }
+    init();
+  }, []);
+
+  const fetchMessagesByConversation = async (conversationId: number) => {
+    const supabase = getSupabase();
+    const { data, error } = await supabase.from('chat_messages').select('*').eq('conversation_id', conversationId).order('created_at', { ascending: true });
+    
+    if (error) {
+      console.error("Error fetching messages:", error);
+      return;
+    }
+
+    setMessages(data.map(m => ({
+      id: m.id,
+      type: m.role as "user" | "ai",
+      content: m.content,
+      timestamp: new Date(m.created_at)
+    })));
+  };
+
+  const createNewChat = async () => {
+    const id = Date.now();
+    const newConv = { id, title: "New Conversation", created_at: new Date().toISOString() };
+    
+    const supabase = getSupabase();
+    const { error } = await supabase.from('conversations').insert([newConv]);
+    
+    if (error) {
+      console.error("Error creating chat:", error);
+      return;
+    }
+
+    setConversations(prev => [{ ...newConv, active: true }, ...prev.map(c => ({ ...c, active: false }))]);
     setMessages([]);
   };
 
   const switchConversation = (id: number) => {
     setConversations(prev => prev.map(c => ({ ...c, active: c.id === id })));
-    setMessages([]);
+    fetchMessagesByConversation(id);
   };
 
-  const deleteConversation = (id: number) => {
+  const deleteConversation = async (id: number) => {
+    const supabase = getSupabase();
+    await supabase.from('conversations').delete().eq('id', id);
     setConversations(prev => prev.filter(c => c.id !== id));
     if (conversations.find(c => c.id === id)?.active) {
       setMessages([]);
@@ -397,6 +486,9 @@ export default function Chat() {
   const handleSend = async () => {
     if ((!input.trim() && attachedFiles.length === 0) || isLoading) return;
 
+    const activeConversation = conversations.find(c => c.active);
+    if (!activeConversation) return;
+
     const userMessageContent = input || "Attached files for analysis.";
     const filesToSend = [...attachedFiles];
     setInput("");
@@ -410,21 +502,56 @@ export default function Chat() {
     try {
       const supabase = getSupabase();
       
+      // Upload files and get URLs (Using Supabase Storage)
+      const uploadedAttachments: { url: string, name: string, type: string }[] = [];
+      
+      for (const file of filesToSend) {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Math.random()}.${fileExt}`;
+        const filePath = `${activeConversation.id}/${fileName}`;
+        
+        let { error: uploadError } = await supabase.storage
+          .from('chat-attachments')
+          .upload(filePath, file);
+        
+        if (uploadError) throw uploadError;
+        
+        const { data: { publicUrl } } = supabase.storage
+          .from('chat-attachments')
+          .getPublicUrl(filePath);
+          
+        uploadedAttachments.push({ url: publicUrl, name: file.name, type: file.type });
+      }
+      
       // Optimistically add to UI
       const optimisticUserMsg: Message = {
         id: Date.now(),
         type: "user",
         content: userMessageContent,
         timestamp: new Date(),
-        attachments: filesToSend.map(f => ({ name: f.name, type: f.type }))
+        attachments: uploadedAttachments
       };
       setMessages(prev => [...prev, optimisticUserMsg]);
 
       // Save to Supabase
-      await supabase.from('chat_messages').insert([{ role: 'user', content: userMessageContent + (filesToSend.length > 0 ? ` [Attached ${filesToSend.length} files]` : "") }]);
+      await supabase.from('chat_messages').insert([{ 
+        role: 'user', 
+        content: userMessageContent,
+        conversation_id: activeConversation.id,
+        attachments: uploadedAttachments
+      }]);
 
-      const systemInstruction = `You are the AI Architect, a highly advanced, privacy-first study assistant. 
-      Your tone is technical, efficient, and encouraging.`;
+      const vaultContext = vaultFiles.length > 0 
+        ? `\nYou have access to the user's Knowledge Vault. The following files are available for reference:
+${vaultFiles.map(f => `- ${f.name} (${f.type}, Category: ${f.category || 'General'})`).join('\n')}
+If the user asks about these files, explain that you can see their metadata. In a future update, you will be able to read their full contents.` 
+        : "";
+
+      const systemInstruction = `You are the AI Architect, a highly advanced, privacy-first study assistant and expert coding partner. 
+      Your tone is technical, efficient, and encouraging.
+      You are highly skilled at writing clean, documented, and modular code in various programming languages. 
+      When asked for code, you provide complete, well-formatted snippets using Markdown code blocks with language specifiers.
+      ${vaultContext}`;
 
       const aiMessageId = Date.now() + 1;
       setMessages(prev => [...prev, { id: aiMessageId, type: "ai", content: "", timestamp: new Date() }]);
@@ -441,7 +568,7 @@ export default function Chat() {
           });
           const data = await response.json();
           setMessages(prev => prev.map(m => m.id === aiMessageId ? { ...m, content: data.content } : m));
-          await supabase.from('chat_messages').insert([{ role: 'ai', content: data.content }]);
+          await supabase.from('chat_messages').insert([{ role: 'ai', content: data.content, conversation_id: activeConversation.id }]);
           setIsLoading(false);
           return;
         } catch (error) {
@@ -451,8 +578,38 @@ export default function Chat() {
       }
 
       if (currentModel.type === "cloud") {
-        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+        const rawApiKey = import.meta.env.VITE_GEMINI_API_KEY;
+        if (!rawApiKey) {
+          throw new Error("Gemini API key is not configured. Please set VITE_GEMINI_API_KEY in your .env file or AI Studio Secrets.");
+        }
+        const apiKey = rawApiKey.replace(/['"]/g, '').trim();
+        const ai = new GoogleGenAI(apiKey);
         
+        // Filter messages to ensure role alternation (user -> model -> user -> model)
+        // Gemini throws 400 if roles are consecutive
+        const filteredHistory = [];
+        let lastRole = null;
+        for (const m of messages) {
+          if (!m.content) continue;
+          const currentRole = m.type === "user" ? "user" : "model";
+          if (currentRole !== lastRole) {
+            filteredHistory.push({
+              role: currentRole,
+              parts: [{ text: m.content }]
+            });
+            lastRole = currentRole;
+          } else {
+             // If consecutive same role, combine them
+             const lastMsg = filteredHistory[filteredHistory.length - 1];
+             lastMsg.parts[0].text += "\n" + m.content;
+          }
+        }
+
+        // If last message was user, pull back history to maintain alternation
+        if (lastRole === "user") {
+          filteredHistory.pop();
+        }
+
         let userParts: any[] = [{ text: userMessageContent }];
         
         if (filesToSend.length > 0) {
@@ -472,13 +629,12 @@ export default function Chat() {
           userParts = [...fileParts, ...userParts];
         }
 
-        const responseStream = await ai.models.generateContentStream({
+        // Using the existing ai.models.generateContentStream structure
+        // Casting to any to avoid property error while maintaining their specific SDK structure
+        const responseStream = await (ai as any).models.generateContentStream({
           model: currentModel.id,
           contents: [
-            ...messages.map(m => ({
-              role: m.type === "user" ? "user" : "model",
-              parts: [{ text: m.content }]
-            })),
+            ...filteredHistory,
             {
               role: "user",
               parts: userParts
@@ -491,14 +647,55 @@ export default function Chat() {
 
         let fullText = "";
         for await (const chunk of responseStream) {
-          fullText += chunk.text;
+          const chunkText = chunk.text || (typeof chunk === 'string' ? chunk : "");
+          fullText += chunkText;
           setMessages(prev => prev.map(m => m.id === aiMessageId ? { ...m, content: fullText } : m));
         }
         
         // Save AI response to Supabase
-        await supabase.from('chat_messages').insert([{ role: 'ai', content: fullText }]);
+        await supabase.from('chat_messages').insert([{ role: 'ai', content: fullText, conversation_id: activeConversation.id }]);
         setIsLoading(false);
 
+      } else if (currentModel.type === "puter") {
+        try {
+          const puter = (window as any).puter;
+          if (!puter) {
+             throw new Error("Puter.js SDK not found. Ensure the script is loaded in index.html and you are not blocking third-party scripts.");
+          }
+
+          const chatMessages = messages.map(m => ({ 
+            role: m.type === "ai" ? "assistant" : "user", 
+            content: m.content 
+          }));
+          
+          chatMessages.push({ role: "user", content: userMessageContent });
+
+          const response = await puter.ai.chat(chatMessages, { 
+            model: currentModel.id,
+            stream: true 
+          });
+
+          let fullContent = "";
+          for await (const part of response) {
+            const delta = (part as any)?.text || (typeof part === 'string' ? part : "");
+            fullContent += delta;
+            setMessages(prev => prev.map(m => m.id === aiMessageId ? { ...m, content: fullContent } : m));
+          }
+
+          await supabase.from('chat_messages').insert([{ 
+            role: 'ai', 
+            content: fullContent, 
+            conversation_id: activeConversation.id 
+          }]);
+          
+          setIsLoading(false);
+        } catch (error: any) {
+          console.error("Puter AI Error:", error);
+          const errorMsg = "Puter AI failed: " + (error.message || "Unknown error");
+          setMessages(prev => prev.map(m => m.id === aiMessageId ? { ...m, content: errorMsg } : m));
+          toast.error(errorMsg);
+          setIsLoading(false);
+        }
       } else {
         // Local Model Inference
         if (localModelStatus !== 'ready') {
@@ -511,9 +708,21 @@ export default function Chat() {
         }));
 
         try {
-          const result = await generateText(userMessageContent, systemInstruction, localMessages);
+          let fullLocalContent = "";
+          const result = await generateText(
+            userMessageContent, 
+            systemInstruction, 
+            localMessages,
+            (delta) => {
+              fullLocalContent += delta;
+              setMessages(prev => prev.map(m => m.id === aiMessageId ? { ...m, content: fullLocalContent } : m));
+            }
+          );
+          
+          // Ensure the final result is set (in case of delta vs complete mismatch)
           setMessages(prev => prev.map(m => m.id === aiMessageId ? { ...m, content: result } : m));
-          await supabase.from('chat_messages').insert([{ role: 'ai', content: result }]);
+          await supabase.from('chat_messages').insert([{ role: 'ai', content: result, conversation_id: activeConversation.id }]);
+          setIsLoading(false);
         } catch (error: any) {
           console.error("Worker Generation Error:", error);
           setMessages(prev => prev.map(m => m.id === aiMessageId ? { ...m, content: "Sorry, I encountered an error generating the response." } : m));
@@ -862,24 +1071,59 @@ export default function Chat() {
                   </div>
                 )}
                 <div
-                  className={`max-w-[80%] ${
+                  className={`max-w-[85%] group relative ${
                     message.type === "user"
                       ? "bg-indigo-600 text-white px-6 py-4 rounded-3xl rounded-tr-sm shadow-xl shadow-indigo-200/50"
-                      : "bg-white/60 backdrop-blur-md border border-white/50 px-6 py-4 rounded-3xl rounded-tl-sm shadow-lg text-slate-800"
+                      : "bg-white border border-slate-200 px-6 py-5 rounded-3xl rounded-tl-sm shadow-sm text-slate-800"
                   }`}
                 >
                   {message.attachments && message.attachments.length > 0 && (
                     <div className="flex flex-wrap gap-2 mb-3">
                       {message.attachments.map((att, i) => (
-                        <div key={i} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold border ${message.type === 'user' ? 'bg-indigo-500/50 border-indigo-400 text-white' : 'bg-indigo-50 border-indigo-100 text-indigo-700'}`}>
+                        <div key={i} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all hover:scale-102 ${message.type === 'user' ? 'bg-indigo-500/50 border-indigo-400 text-white' : 'bg-slate-50 border-slate-200 text-slate-600'}`}>
                           <FileText className="w-3 h-3" />
                           <span className="truncate max-w-[150px]">{att.name}</span>
                         </div>
                       ))}
                     </div>
                   )}
-                  <div className="markdown-body text-[15px] leading-relaxed font-medium">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  <div className={`markdown-body text-[15px] leading-relaxed ${message.type === "user" ? "text-indigo-50" : "text-slate-700"}`}>
+                    <ReactMarkdown 
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        code({ node, inline, className, children, ...props }: any) {
+                          const match = /language-(\w+)/.exec(className || '');
+                          return !inline && match ? (
+                            <div className="my-4 rounded-xl overflow-hidden border border-slate-700/10 shadow-lg">
+                              <div className="bg-slate-800 px-4 py-2 flex justify-between items-center">
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{match[1]}</span>
+                                <button 
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(String(children).replace(/\n$/, ''));
+                                    toast.success("Code copied to clipboard");
+                                  }}
+                                  className="text-slate-400 hover:text-white transition-colors"
+                                >
+                                  <CheckCircle2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                              <SyntaxHighlighter
+                                {...props}
+                                children={String(children).replace(/\n$/, '')}
+                                style={vscDarkPlus}
+                                language={match[1]}
+                                PreTag="div"
+                                customStyle={{ margin: 0, padding: '1.5rem', fontSize: '0.875rem' }}
+                              />
+                            </div>
+                          ) : (
+                            <code className={className} {...props}>
+                              {children}
+                            </code>
+                          );
+                        }
+                      }}
+                    >
                       {message.content}
                     </ReactMarkdown>
                   </div>
@@ -1042,6 +1286,38 @@ export default function Chat() {
                 </div>
               </div>
 
+              {/* Integrated Knowledge */}
+              <div className="space-y-3">
+                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Integrated Knowledge</h4>
+                <div className="p-4 bg-white/60 backdrop-blur-md border border-white/50 rounded-2xl shadow-lg space-y-4">
+                  {vaultFiles.length > 0 ? (
+                    <div className="space-y-4">
+                      {vaultFiles.slice(0, 5).map((file, i) => (
+                        <div key={i} className="flex items-start gap-3">
+                          <div className="p-2 bg-emerald-100 rounded-lg">
+                            <Book className="w-4 h-4 text-emerald-600" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-bold text-slate-800 truncate">{file.name}</div>
+                            <div className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">{file.category || 'Vault File'}</div>
+                          </div>
+                        </div>
+                      ))}
+                      {vaultFiles.length > 5 && (
+                        <div className="text-[10px] font-bold text-slate-400 text-center uppercase tracking-widest pt-2 border-t border-slate-100">
+                          + {vaultFiles.length - 5} more files in vault
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-xs font-medium text-slate-500 text-center py-2 flex flex-col items-center gap-2">
+                       <Library className="w-8 h-8 text-slate-300 opacity-50" />
+                       Vault is currently empty.
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* Connectors Integration */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -1079,6 +1355,25 @@ export default function Chat() {
                   </button>
                 </div>
               </div>
+
+              {/* AI Model Info */}
+              <section className="space-y-3">
+                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">AI Model Info</h4>
+                <div className="p-4 bg-white/60 backdrop-blur-md border border-white/50 rounded-2xl shadow-lg space-y-3">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-bold text-slate-500">Model</span>
+                    <span className="font-bold text-slate-800">{currentModel.name}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-bold text-slate-500">Provider</span>
+                    <span className="font-bold text-slate-800">{currentModel.provider}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-bold text-slate-500">Mode</span>
+                    <span className="font-bold text-slate-800 uppercase">{currentModel.type}</span>
+                  </div>
+                </div>
+              </section>
 
             </div>
           </motion.aside>

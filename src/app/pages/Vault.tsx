@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion } from "framer-motion";
+import { toast } from "sonner";
 import { 
   Lock, 
   Search, 
@@ -53,10 +54,14 @@ export default function Vault() {
   const [isLoading, setIsLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [user, setUser] = useState<any>(null);
+
   useEffect(() => {
     async function fetchData() {
       try {
         const supabase = getSupabase();
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        setUser(authUser);
         
         const [foldersResponse, filesResponse] = await Promise.all([
           supabase.from('vault_folders').select('*').order('created_at', { ascending: true }),
@@ -116,15 +121,22 @@ export default function Vault() {
   }, []);
 
   const handleCreateFolder = async () => {
+    const folderName = window.prompt("Enter directory name:", "New Research Archive");
+    if (!folderName) return;
+
     const newFolder = {
-      name: "New Folder",
-      color: ["indigo", "blue", "emerald", "orange", "rose"][Math.floor(Math.random() * 5)]
+      name: folderName,
+      color: ["indigo", "blue", "emerald", "orange", "rose"][Math.floor(Math.random() * 5)],
+      user_id: user?.id || null
     };
     try {
       const supabase = getSupabase();
-      await supabase.from('vault_folders').insert([newFolder]);
-    } catch (error) {
+      const { error } = await supabase.from('vault_folders').insert([newFolder]);
+      if (error) throw error;
+      toast.success(`Directory "${folderName}" created.`);
+    } catch (error: any) {
       console.error("Error creating folder:", error);
+      toast.error(`Failed to create directory: ${error.message}`);
     }
   };
 
@@ -132,9 +144,8 @@ export default function Vault() {
     fileInputRef.current?.click();
   };
 
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const processUpload = async (file: File) => {
+    const toastId = toast.loading(`Uploading ${file.name}...`);
 
     try {
       const supabase = getSupabase();
@@ -150,7 +161,8 @@ export default function Vault() {
         name: file.name,
         type: typeStr,
         size: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
-        starred: false
+        starred: false,
+        user_id: user?.id || null
       };
 
       try {
@@ -161,22 +173,57 @@ export default function Vault() {
         
         if (!storageError && storageData) {
            newFile.url = storageData.path;
-        } else if (storageError) {
-          console.warn("Could not upload to storage bucket 'vault'. Saving metadata only.");
         }
       } catch (storageException) {
          console.warn("Storage exception:", storageException);
       }
 
-      await supabase.from('vault_files').insert([newFile]);
+      const { error: insertError } = await supabase.from('vault_files').insert([newFile]);
       
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    } catch (error) {
+      if (insertError) throw insertError;
+
+      toast.success(`${file.name} added to archives successfully.`, { id: toastId });
+    } catch (error: any) {
       console.error("Error uploading file:", error);
+      toast.error(`Failed to add resource: ${error.message || 'Unknown error'}`, { id: toastId });
     }
   };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    await processUpload(file);
+    
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      processUpload(files[0]);
+    }
+  }, [user]);
 
   const toggleStar = async (fileId: string, currentStatus: boolean) => {
     try {
@@ -209,8 +256,19 @@ export default function Vault() {
       variants={containerVariants}
       initial="initial"
       animate="animate"
-      className="p-8 space-y-12 max-w-[1600px] mx-auto relative overflow-hidden"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      className={`p-8 space-y-12 max-w-[1600px] mx-auto relative overflow-hidden transition-colors ${isDragging ? 'bg-indigo-50/50 ring-4 ring-indigo-500/20 rounded-[3rem]' : ''}`}
     >
+      {isDragging && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none">
+          <div className="bg-indigo-600/90 backdrop-blur-xl p-12 rounded-[3.5rem] shadow-2xl border-4 border-indigo-400/50 flex flex-col items-center gap-6 animate-in zoom-in duration-300">
+             <Upload className="w-16 h-16 text-white animate-bounce" />
+             <span className="text-2xl font-black text-white uppercase tracking-widest">Release to Decrypt Archive</span>
+          </div>
+        </div>
+      )}
       {/* Background Orbs */}
       <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-indigo-500/5 blur-[160px] rounded-full pointer-events-none" />
       <div className="absolute bottom-0 left-0 w-[800px] h-[800px] bg-purple-500/5 blur-[160px] rounded-full pointer-events-none" />
@@ -366,10 +424,9 @@ export default function Vault() {
 
         {/* Sidebar Stats */}
         <div className="space-y-16">
-          {/* Storage Card */}
+          {/* Storage Information */}
           <motion.div 
             variants={cardVariants}
-            whileHover="hover"
             className="bg-white/40 backdrop-blur-3xl border border-white/20 rounded-3xl p-8 shadow-xl space-y-8 relative overflow-hidden"
           >
             <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-indigo-500/10 blur-[140px] rounded-full pointer-events-none" />
@@ -379,10 +436,10 @@ export default function Vault() {
                 <div className="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center shadow-inner">
                   <HardDrive strokeWidth={3} className="w-6 h-6 text-indigo-600" />
                 </div>
-                <div className="text-[10px] font-bold text-slate-400 tracking-[0.3em] uppercase">Storage Protocol</div>
+                <div className="text-[10px] font-bold text-slate-400 tracking-[0.3em] uppercase">Archive Storage</div>
               </div>
               <div className="text-xl font-bold tracking-tight text-slate-900 leading-none">4.8<span className="text-base text-slate-300 ml-2">GB</span></div>
-              <div className="text-base font-bold text-slate-400 tracking-tight">of 15 GB total capacity</div>
+              <div className="text-base font-bold text-slate-400 tracking-tight">Current utilization of your vault</div>
             </div>
             
             <div className="space-y-6 relative z-10">
@@ -396,39 +453,6 @@ export default function Vault() {
               </div>
               <div className="flex justify-between text-[10px] font-bold tracking-[0.3em] text-slate-500 uppercase">
                 <span>32% Occupied</span>
-                <span className="text-indigo-600">10.2 GB Free</span>
-              </div>
-            </div>
-
-            <motion.button 
-              whileHover={{ scale: 1.05, y: -5 }}
-              whileTap={{ scale: 0.95 }}
-              className="w-full py-4 bg-white/80 hover:bg-white border border-white/60 rounded-2xl text-base font-bold text-slate-900 transition-all shadow-lg relative z-10"
-            >
-              Expand Capacity
-            </motion.button>
-          </motion.div>
-
-          {/* Security Card */}
-          <motion.div 
-            variants={cardVariants}
-            whileHover="hover"
-            className="bg-indigo-600 rounded-3xl p-8 shadow-xl shadow-indigo-200 relative overflow-hidden group cursor-pointer"
-          >
-            <div className="absolute -right-40 -bottom-40 w-[500px] h-[500px] bg-white/10 blur-[160px] rounded-full group-hover:scale-150 transition-transform duration-1000" />
-            <div className="relative space-y-8">
-              <div className="w-16 h-16 rounded-2xl bg-white/10 backdrop-blur-3xl flex items-center justify-center border border-white/20 shadow-xl group-hover:rotate-12 transition-transform">
-                <Shield strokeWidth={3} className="w-8 h-8 text-white" />
-              </div>
-              <div className="space-y-6">
-                <h3 className="text-lg font-bold tracking-tight text-white">Quantum Encryption</h3>
-                <p className="text-indigo-100/80 text-base font-semibold leading-relaxed tracking-tight">
-                  Your knowledge base is protected by AES-256-GCM encryption. Keys are stored locally in your secure enclave.
-                </p>
-              </div>
-              <div className="flex items-center gap-6 text-white font-bold text-base group-hover:gap-10 transition-all">
-                <span>Security Audit</span>
-                <ChevronRight strokeWidth={4} className="w-7 h-7" />
               </div>
             </div>
           </motion.div>

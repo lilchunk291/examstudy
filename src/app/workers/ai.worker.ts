@@ -1,4 +1,4 @@
-import { pipeline, env } from '@huggingface/transformers';
+import { pipeline, env, TextStreamer } from '@huggingface/transformers';
 
 // Disable local models since we are running in the browser
 env.allowLocalModels = false;
@@ -51,7 +51,7 @@ self.addEventListener('message', async (event) => {
       
       // Construct chat history
       const chatMessages = [
-        { role: 'system', content: systemPrompt },
+        { role: 'system', content: systemPrompt || "" },
         ...(messages || []),
         { role: 'user', content: text }
       ];
@@ -62,15 +62,24 @@ self.addEventListener('message', async (event) => {
         add_generation_prompt: true,
       });
 
+      // Streamer for real-time updates
+      const streamer = new TextStreamer(generator.tokenizer, {
+        skip_prompt: true,
+        callback_function: (text: string) => {
+          self.postMessage({ status: 'delta', result: text });
+        },
+      });
+
       // Generate response
       const result = await generator(prompt, {
         max_new_tokens: 512,
         temperature: 0.7,
         repetition_penalty: 1.1,
         do_sample: true,
+        streamer: streamer,
       });
 
-      // Extract the generated text (removing the prompt)
+      // Extract the generated text (if we need the final result separately)
       let generatedText = result[0].generated_text;
       if (generatedText.startsWith(prompt)) {
         generatedText = generatedText.slice(prompt.length).trim();

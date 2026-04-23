@@ -21,14 +21,15 @@ import {
   Zap,
   Menu,
   Moon,
-  Sun
+  Sun,
+  Target
 } from "lucide-react";
 import FloatingAI from "./FloatingAI";
 import { getSupabase } from "../../lib/supabase";
 
 const navItems = [
   { to: "/app", icon: LayoutDashboard, label: "Dashboard" },
-  { to: "/app/study", icon: BookOpen, label: "Study Plan" },
+  { to: "/app/study-plan", icon: Target, label: "Study Plan" },
   { to: "/app/rooms", icon: Users, label: "Silent Rooms" },
   { to: "/app/chat", icon: MessageSquare, label: "AI Assistant" },
   { to: "/app/vault", icon: Lock, label: "Knowledge Vault" },
@@ -41,21 +42,50 @@ export default function Layout() {
   const navigate = useNavigate();
   const [userName, setUserName] = useState<string>("Username");
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
+  const [userStats, setUserStats] = useState({ level: 1, xp: 0 });
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   const { theme, setTheme } = useTheme();
 
   useEffect(() => {
-    async function fetchUser() {
+    async function fetchData() {
       const supabase = getSupabase();
+      
+      // Fetch User
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const name = user.user_metadata?.full_name || user.user_metadata?.name || (user.email ? user.email.split('@')[0] : "Username");
         setUserName(name);
         setUserAvatar(user.user_metadata?.avatar_url || user.user_metadata?.picture || null);
       }
+
+      // Fetch Stats
+      const { count } = await supabase
+        .from('tasks')
+        .select('*', { count: 'exact', head: true })
+        .eq('completed', true);
+      
+      const xpPerTask = 150;
+      const totalXp = (count || 0) * xpPerTask;
+      const level = Math.floor(totalXp / 1000) + 1;
+      const currentLevelXp = totalXp % 1000;
+      
+      setUserStats({ level, xp: currentLevelXp });
     }
-    fetchUser();
+    fetchData();
+
+    // Subscribe to task changes to update XP in real-time
+    const supabase = getSupabase();
+    const channel = supabase
+      .channel('header-stats')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => {
+        fetchData();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const handleLogout = async (e: any) => {
@@ -150,7 +180,7 @@ export default function Layout() {
               )}
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-black truncate text-foreground tracking-tight">{userName}</div>
-                <div className="text-[10px] font-black text-orange-500 uppercase tracking-[0.2em] truncate">Premium Protocol</div>
+                <div className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] truncate">Active Session</div>
               </div>
               <button 
                 onClick={handleLogout}
@@ -194,8 +224,8 @@ export default function Layout() {
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-4 px-4 py-2 bg-card/60 backdrop-blur-3xl border border-border rounded-2xl shadow-lg">
               <div className="flex flex-col items-end">
-                <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Level 12</span>
-                <span className="text-sm font-black text-accent-primary tracking-tight">2,450 XP</span>
+                <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Level {userStats.level}</span>
+                <span className="text-sm font-black text-accent-primary tracking-tight">{userStats.xp} XP</span>
               </div>
               <div className="w-10 h-10 rounded-xl bg-accent-primary flex items-center justify-center shadow-lg shadow-accent-primary/20">
                 <Zap className="text-white w-5 h-5 fill-current" strokeWidth={2.5} />
@@ -251,10 +281,10 @@ export default function Layout() {
         
         {/* Footer Overlay */}
         <div className="absolute bottom-4 left-0 right-0 flex justify-center items-center gap-8 text-[10px] font-black tracking-[0.3em] text-muted-foreground uppercase pointer-events-none z-0">
-          <span className="hover:text-accent-primary transition-colors pointer-events-auto cursor-pointer">© 2026 StudyVault Protocol</span>
-          <span className="hover:text-accent-primary transition-colors pointer-events-auto cursor-pointer">Manifesto</span>
-          <span className="hover:text-accent-primary transition-colors pointer-events-auto cursor-pointer">Quantum Encryption</span>
-          <span className="hover:text-accent-primary transition-colors pointer-events-auto cursor-pointer">Privacy Protocol</span>
+          <span className="hover:text-accent-primary transition-colors pointer-events-auto cursor-pointer">© 2026 StudyVault</span>
+          <span className="hover:text-accent-primary transition-colors pointer-events-auto cursor-pointer">Resources</span>
+          <span className="hover:text-accent-primary transition-colors pointer-events-auto cursor-pointer">Privacy</span>
+          <span className="hover:text-accent-primary transition-colors pointer-events-auto cursor-pointer">Security</span>
         </div>
         <FloatingAI />
       </div>

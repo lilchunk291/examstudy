@@ -41,7 +41,32 @@ export default function Dashboard() {
   
   const [tasks, setTasks] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
+  const [sessionTime, setSessionTime] = useState(2720); // 45:20 in seconds
   const [isLoading, setIsLoading] = useState(true);
+
+  const completedTasksCount = tasks.filter(t => t.completed).length;
+  const totalTasksCount = tasks.length;
+  const xpPerTask = 150;
+  const xp = completedTasksCount * xpPerTask;
+  const xpToNextLevel = 1000;
+  const level = Math.floor(xp / xpToNextLevel) + 1;
+  const xpInCurrentLevel = xp % xpToNextLevel;
+  const progressToNextLevel = totalTasksCount > 0 ? (xpInCurrentLevel / xpToNextLevel) * 100 : 0;
+
+  useEffect(() => {
+    // Timer reduction simulation
+    const timer = setInterval(() => {
+      setSessionTime((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  };
+
   const [userName, setUserName] = useState<string>("Username");
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
 
@@ -259,25 +284,19 @@ export default function Dashboard() {
           <div className="relative z-10 flex-1 flex flex-col justify-center items-center my-12">
             {/* Massive high-contrast digits */}
             <h1 className="text-7xl leading-none font-bold text-slate-900 tracking-tight select-none group-hover:scale-105 transition-transform duration-700">
-              45:20
+              {formatTime(sessionTime)}
             </h1>
-            <p className="text-[10px] font-bold tracking-[0.4em] uppercase text-slate-400 mt-8 bg-white/40 px-8 py-2 rounded-full border border-white/40 shadow-inner">Remaining in Focus Block</p>
+            <p className="text-[10px] font-bold tracking-[0.4em] uppercase text-slate-400 mt-8 bg-white/40 px-8 py-2 rounded-full border border-white/40 shadow-inner">Remaining in Active Study Block</p>
           </div>
           
           <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
             <div className="flex items-center gap-6">
-              <div className="flex -space-x-4">
-                {[1, 2, 3, 4].map(i => (
-                  <motion.div 
-                    key={i} 
-                    whileHover={{ y: -5, zIndex: 50 }}
-                    className={`w-12 h-12 rounded-full border-4 border-white shadow-lg z-${40-i*10} bg-gradient-to-br from-indigo-${200+i*100} to-purple-${300+i*100} cursor-pointer transition-all`} 
-                  />
-                ))}
+              <div className="w-12 h-12 rounded-xl bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20 shadow-inner group-hover:scale-110 transition-transform">
+                <Target strokeWidth={3} className="w-6 h-6 text-indigo-600" />
               </div>
               <div className="space-y-1">
-                <div className="text-base font-bold text-slate-800 tracking-tight">Collaborating with 3 peers</div>
-                <div className="text-[10px] font-bold text-indigo-600 uppercase tracking-[0.3em]">Silent Room Active</div>
+                <div className="text-base font-bold text-slate-800 tracking-tight">Active Focus Session</div>
+                <div className="text-[10px] font-bold text-indigo-600 uppercase tracking-[0.3em]">Concentration Protocol</div>
               </div>
             </div>
             
@@ -303,14 +322,14 @@ export default function Dashboard() {
           >
             <div className="absolute -bottom-32 -right-32 w-80 h-80 bg-orange-500/10 blur-[120px] rounded-full pointer-events-none group-hover:bg-orange-500/20 transition-all duration-700" />
             
-            <div className="relative z-10 space-y-6">
+            <div className="relative z-10 space-y-6" id="progress-stats-card">
               <div className="flex justify-between items-start">
                 <div className="w-14 h-14 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform">
                   <Zap strokeWidth={3} className="w-8 h-8 text-orange-600 fill-current" />
                 </div>
                 <div className="flex flex-col items-end">
-                  <div className="flex items-center gap-2 text-[10px] font-bold text-orange-600 bg-orange-500/10 px-4 py-1 rounded-full border border-orange-500/20 shadow-lg">
-                    <span className="tracking-[0.2em] uppercase">12 Day Streak</span>
+                  <div className="flex items-center gap-2 text-[10px] font-bold text-orange-600 bg-orange-500/10 px-4 py-1 rounded-full border border-orange-500/20 shadow-lg animate-pulse">
+                    <span className="tracking-[0.2em] uppercase">Live Sync</span>
                   </div>
                 </div>
               </div>
@@ -318,20 +337,22 @@ export default function Dashboard() {
               <div className="space-y-4">
                 <div className="flex justify-between items-end">
                   <div className="space-y-1">
-                    <div className="text-2xl font-bold text-slate-900 tracking-tight">Level 12</div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em]">Scholar Protocol</p>
+                    <div className="text-2xl font-bold text-slate-900 tracking-tight">Level {level}</div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em]">
+                      {level < 5 ? "Novice Protocol" : level < 15 ? "Scholar Protocol" : "Archon Protocol"}
+                    </p>
                   </div>
                   <div className="text-right">
-                    <div className="text-sm font-black text-indigo-600">2,450 / 3,000 XP</div>
+                    <div className="text-sm font-black text-indigo-600">{xpInCurrentLevel} / {xpToNextLevel} XP</div>
                   </div>
                 </div>
                 
                 <div className="w-full h-3 bg-white/60 rounded-full overflow-hidden border border-white/60 p-0.5 shadow-inner">
                   <motion.div 
                     initial={{ width: 0 }}
-                    animate={{ width: "81%" }}
+                    animate={{ width: `${progressToNextLevel}%` }}
                     transition={{ duration: 1.5, ease: "easeOut" }}
-                    className="h-full bg-gradient-to-r from-orange-400 to-rose-500 rounded-full shadow-lg shadow-orange-200" 
+                    className="h-full bg-gradient-to-r from-orange-400 via-rose-500 to-indigo-600 rounded-full shadow-[0_0_15px_rgba(249,115,22,0.4)] animate-pulse" 
                   />
                 </div>
               </div>
@@ -395,11 +416,13 @@ export default function Dashboard() {
           <div className="flex flex-col md:flex-row justify-between items-start gap-8 mb-12">
             <div className="flex items-center gap-6">
               <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform">
-                <Activity strokeWidth={3} className="w-8 h-8 text-indigo-600" />
+                <Target strokeWidth={3} className="w-8 h-8 text-indigo-600" />
               </div>
               <div className="space-y-1">
-                <h3 className="font-bold text-slate-900 text-xl tracking-tight">Activity Flow</h3>
-                <p className="text-base font-medium text-slate-400 tracking-tight">Visualizing peak focus hours across domains</p>
+                <h3 className="font-bold text-slate-900 text-xl tracking-tight">Focus Progress</h3>
+                <p className="text-base font-medium text-slate-400 tracking-tight">
+                  {completedTasksCount} of {totalTasksCount} milestones achieved ({Math.round((completedTasksCount / (totalTasksCount || 1)) * 100)}%)
+                </p>
               </div>
             </div>
             <div className="flex bg-white/60 backdrop-blur-md border border-white/60 rounded-full p-2 shadow-lg">

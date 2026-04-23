@@ -6,7 +6,7 @@ interface AIWorkerContextState {
   progress: number;
   currentModelId: string | null;
   loadModel: (modelId: string) => void;
-  generateText: (text: string, systemPrompt: string, messages?: any[]) => Promise<string>;
+  generateText: (text: string, systemPrompt: string, messages?: any[], onDelta?: (delta: string) => void) => Promise<string>;
 }
 
 const AIWorkerContext = createContext<AIWorkerContextState | null>(null);
@@ -18,6 +18,7 @@ export function AIWorkerProvider({ children }: { children: ReactNode }) {
   const [currentModelId, setCurrentModelId] = useState<string | null>(null);
   const resolveGenerateRef = useRef<((value: string) => void) | null>(null);
   const rejectGenerateRef = useRef<((reason?: any) => void) | null>(null);
+  const onDeltaRef = useRef<((delta: string) => void) | null>(null);
 
   useEffect(() => {
     // Initialize the worker once when the provider mounts
@@ -40,6 +41,11 @@ export function AIWorkerProvider({ children }: { children: ReactNode }) {
           break;
         case 'generating':
           setStatus('generating');
+          break;
+        case 'delta':
+          if (onDeltaRef.current) {
+            onDeltaRef.current(data.result);
+          }
           break;
         case 'complete':
           setStatus('ready');
@@ -81,7 +87,7 @@ export function AIWorkerProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const generateText = (text: string, systemPrompt: string, messages?: any[]): Promise<string> => {
+  const generateText = (text: string, systemPrompt: string, messages?: any[], onDelta?: (delta: string) => void): Promise<string> => {
     return new Promise((resolve, reject) => {
       if (!workerRef.current) {
         reject(new Error("Worker not initialized"));
@@ -95,6 +101,7 @@ export function AIWorkerProvider({ children }: { children: ReactNode }) {
 
       resolveGenerateRef.current = resolve;
       rejectGenerateRef.current = reject;
+      onDeltaRef.current = onDelta || null;
 
       workerRef.current.postMessage({
         type: 'generate',

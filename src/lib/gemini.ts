@@ -4,11 +4,20 @@ import { GoogleGenAI } from "@google/genai";
 // Note: In a real app, this should be called from a backend route to protect the API key.
 // For this demo, we use it directly if available.
 export const getGeminiClient = () => {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
-  if (!apiKey) {
+  const rawKey = import.meta.env.VITE_GEMINI_API_KEY;
+  if (!rawKey) {
     console.warn("Gemini API key not found. LLM enhancements will be disabled.");
     return null;
   }
+  
+  // Clean up key: remove quotes and whitespace
+  const apiKey = rawKey.replace(/['"]/g, '').trim();
+  
+  if (!apiKey) {
+    console.warn("Gemini API key is empty after sanitization.");
+    return null;
+  }
+
   return new GoogleGenAI({ apiKey });
 };
 
@@ -30,7 +39,7 @@ export const enhanceStrategyWithLLM = async (nodes: any[], currentPlan: any[]) =
     `;
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3-flash-preview",
       contents: prompt,
       config: {
         responseMimeType: "application/json",

@@ -68,7 +68,25 @@ export default function Schedule() {
   const [isAiPanelOpen, setIsAiPanelOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationStep, setGenerationStep] = useState("");
-  const [aiConfig, setAiConfig] = useState({ targetHours: 6, intensity: "Balanced", learningStyle: "Visual", examType: "MCQ", studyGoals: "", topics: "", prioritizeBacklogs: false });
+  const [aiConfig, setAiConfig] = useState<{
+    targetHours: number;
+    intensity: string;
+    learningStyle: string;
+    examType: string;
+    studyGoals: string;
+    topics: string;
+    prioritizeBacklogs: boolean;
+    preferredTimeSlots: string[];
+  }>({ 
+    targetHours: 6, 
+    intensity: "Balanced", 
+    learningStyle: "Visual", 
+    examType: "MCQ", 
+    studyGoals: "", 
+    topics: "", 
+    prioritizeBacklogs: false,
+    preferredTimeSlots: ["morning", "afternoon"]
+  });
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [newSession, setNewSession] = useState({ 
@@ -555,7 +573,19 @@ export default function Schedule() {
       // 1. Initialize Q-Table for state-action pairs (time slots vs intensity)
       // 2. Use Multi-Armed Bandit to balance exploration (new time slots) vs exploitation (known productive slots)
       // 3. Apply Genetic Algorithm to evolve the best sequence of study sessions over the week
-      const baseHour = aiConfig.intensity === "Sprint" ? 8 : 10;
+      
+      const slotHours: Record<string, number> = {
+        "early-bird": 5,
+        "morning": 8,
+        "afternoon": 13,
+        "evening": 18,
+        "night": 22
+      };
+
+      const baseHour = aiConfig.preferredTimeSlots && aiConfig.preferredTimeSlots.length > 0 
+        ? slotHours[aiConfig.preferredTimeSlots[0]] 
+        : (aiConfig.intensity === "Sprint" ? 8 : 10);
+
       const duration = aiConfig.intensity === "Deep Work" ? 180 : (aiConfig.intensity === "Sprint" ? 45 : 120);
       
       // --- Simulated CSP (k-consistency) ---
@@ -2044,6 +2074,34 @@ export default function Schedule() {
                           <div className={`text-sm font-bold ${aiConfig.intensity === p.name ? 'text-indigo-900' : 'text-slate-900'}`}>{p.name}</div>
                           <div className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">{p.desc}</div>
                         </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Preferred Study Slots</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { id: "early-bird", label: "Early Bird (5am-9am)" },
+                      { id: "morning", label: "Morning (8am-12pm)" },
+                      { id: "afternoon", label: "Afternoon (1pm-5pm)" },
+                      { id: "evening", label: "Evening (6pm-10pm)" },
+                      { id: "night", label: "Night Owl (10pm-2am)" }
+                    ].map(slot => (
+                      <button 
+                        key={slot.id} 
+                        onClick={() => {
+                          const current = aiConfig.preferredTimeSlots || [];
+                          const next = current.includes(slot.id) 
+                            ? current.filter(id => id !== slot.id)
+                            : [...current, slot.id];
+                          setAiConfig({...aiConfig, preferredTimeSlots: next});
+                        }}
+                        className={`py-3 px-4 rounded-xl border text-xs font-bold transition-all text-left flex items-center justify-between ${aiConfig.preferredTimeSlots?.includes(slot.id) ? 'border-indigo-500 text-indigo-600 bg-indigo-50' : 'border-slate-200 text-slate-600 hover:border-indigo-500 hover:text-indigo-600'}`}
+                      >
+                        <span>{slot.label}</span>
+                        {aiConfig.preferredTimeSlots?.includes(slot.id) && <CheckCircle2 className="w-3 h-3" />}
                       </button>
                     ))}
                   </div>

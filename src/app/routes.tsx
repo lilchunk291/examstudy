@@ -3,7 +3,7 @@ import Layout from "./components/Layout";
 import Home from "./pages/Home";
 import Dashboard from "./pages/Dashboard";
 import Schedule from "./pages/Schedule";
-import Study from "./pages/Study";
+import StudyPlan from "./pages/StudyPlan";
 import Chat from "./pages/Chat";
 import Analytics from "./pages/Analytics";
 import Crisis from "./pages/Crisis";
@@ -46,7 +46,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, Component: Dashboard },
       { path: "schedule", Component: Schedule },
-      { path: "study", Component: Study },
+      { path: "study-plan", Component: StudyPlan },
       { path: "rooms", Component: SilentRooms },
       { path: "chat", Component: Chat },
       { path: "analytics", Component: Analytics },
