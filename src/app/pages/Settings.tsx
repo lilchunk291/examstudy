@@ -183,10 +183,10 @@ export default function Settings() {
           <div className="bg-white/40 backdrop-blur-3xl rounded-3xl p-5 border border-white/20 shadow-xl space-y-4">
             {[
               { id: "profile", label: "Profile", icon: User },
-              { id: "ai", label: "AI Assistant", icon: Brain },
-              { id: "notifications", label: "Notifications", icon: Bell },
-              { id: "privacy", label: "Privacy & Security", icon: Shield },
-              { id: "integrations", label: "Integrations", icon: Link2 },
+              { id: "ai", label: "AI Assistant", icon: Brain, to: "/app/settings/ai-assistant" },
+              { id: "notifications", label: "Notifications", icon: Bell, to: "/app/settings/notifications" },
+              { id: "privacy", label: "Privacy & Security", icon: Shield, to: "/app/settings/privacy" },
+              { id: "integrations", label: "Integrations", icon: Link2, to: "/app/settings/integrations" },
               { id: "theme", label: "Theme", icon: Sparkles, to: "/app/theme" },
             ].map((item, i) => (
               <motion.button 
